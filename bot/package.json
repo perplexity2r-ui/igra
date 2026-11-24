@@ -1,0 +1,11 @@
+{
+  "name": "minecraft-pvp-bot",
+  "version": "1.0.0",
+  "main": "bot.js",
+  "dependencies": {
+    "minecraft-protocol": "1.47.0",
+    "mineflayer": "4.20.1",
+    "prismarine-physics": "1.8.0",
+    "ws": "^8.17.0"
+  }
+}
