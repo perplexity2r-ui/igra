@@ -1,0 +1,14 @@
+[
+  {
+    "uuid": "23b95b27-c1ca-34d4-814c-c031f966a195",
+    "name": "LearnerBot",
+    "level": 4,
+    "bypassesPlayerLimit": false
+  },
+  {
+    "uuid": "461da519-6747-3593-ac2c-ddf98075b053",
+    "name": "EnemyBot",
+    "level": 4,
+    "bypassesPlayerLimit": false
+  }
+]
