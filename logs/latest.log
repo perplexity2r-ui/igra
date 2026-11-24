@@ -1,0 +1,870 @@
+[17:15:41] [main/INFO]: Environment: authHost='https://authserver.mojang.com', accountsHost='https://api.mojang.com', sessionHost='https://sessionserver.mojang.com', servicesHost='https://api.minecraftservices.com', name='PROD'
+[17:15:41] [main/INFO]: Found new data pack file/bukkit, loading it automatically
+[17:15:41] [main/INFO]: Reloading ResourceManager: Default, bukkit
+[17:15:42] [Worker-Main-1/INFO]: Loaded 7 recipes
+[17:15:43] [Server thread/INFO]: Starting minecraft server version 1.16.5
+[17:15:43] [Server thread/INFO]: Loading properties
+[17:15:43] [Server thread/INFO]: This server is running Paper version git-Paper-794 (MC: 1.16.5) (Implementing API version 1.16.5-R0.1-SNAPSHOT)
+[17:15:43] [Server thread/INFO]: Server Ping Player Sample Count: 12
+[17:15:43] [Server thread/INFO]: Using 4 threads for Netty based IO
+[17:15:43] [Server thread/INFO]: Debug logging is disabled
+[17:15:43] [Server thread/INFO]: Default game type: SURVIVAL
+[17:15:43] [Server thread/INFO]: Generating keypair
+[17:15:43] [Server thread/INFO]: Starting Minecraft server on *:25565
+[17:15:43] [Server thread/INFO]: Using epoll channel type
+[17:15:43] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!
+[17:15:43] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.
+[17:15:43] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.
+[17:15:43] [Server thread/WARN]: To change this, set "online-mode" to "true" in the server.properties file.
+[17:15:43] [Server thread/INFO]: Preparing level "world"
+[17:15:46] [Server thread/WARN]: Unable to find spawn biome
+[17:15:46] [Server thread/WARN]: Unable to find spawn biome
+[17:15:46] [Server thread/INFO]: Preparing start region for dimension minecraft:overworld
+[17:15:47] [Worker-Main-1/INFO]: Preparing spawn area: 0%
+[17:15:47] [Worker-Main-1/INFO]: Preparing spawn area: 0%
+[17:15:47] [Server thread/INFO]: Time elapsed: 529 ms
+[17:15:47] [Server thread/INFO]: Preparing start region for dimension minecraft:the_nether
+[17:15:47] [Worker-Main-1/INFO]: Preparing spawn area: 0%
+[17:15:48] [Worker-Main-1/INFO]: Preparing spawn area: 0%
+[17:15:48] [Server thread/INFO]: Time elapsed: 735 ms
+[17:15:48] [Server thread/INFO]: Preparing start region for dimension minecraft:the_end
+[17:15:48] [Server thread/INFO]: Time elapsed: 735 ms
+[17:15:49] [Server thread/INFO]: Running delayed init tasks
+[17:15:49] [Server thread/INFO]: Done (5.992s)! For help, type "help"
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] ************************************************************
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * WARNING - YOU ARE RUNNING AN OUTDATED VERSION OF JAVA.
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * PAPER WILL STOP BEING COMPATIBLE WITH THIS VERSION OF
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * JAVA WHEN MINECRAFT 1.17 IS RELEASED.
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] *
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * Please update the version of Java you use to run Paper
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * to at least Java 16. When Paper for Minecraft 1.17 is
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * released support for versions of Java before 16 will
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * be dropped.
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] *
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * Current Java version: 11
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] *
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] * Check this forum post for more information: 
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] *   https://papermc.io/java16
+[17:15:49] [Server thread/WARN]: [io.papermc.paper.util.PaperJvmChecker] ************************************************************
+[17:15:49] [Server thread/INFO]: Timings Reset
+[17:15:52] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:15:53] [Server thread/INFO]: EnemyBot joined the game
+[17:15:53] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:37106] logged in with entity id 4 at ([world]24.5, 77.0, 83.5)
+[17:16:01] [Server thread/INFO]: EnemyBot lost connection: Disconnected
+[17:16:01] [Server thread/INFO]: EnemyBot left the game
+[17:16:04] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:16:05] [Server thread/INFO]: LearnerBot joined the game
+[17:16:05] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:33184] logged in with entity id 158 at ([world]18.5, 80.0, 74.5)
+[17:16:07] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:16:08] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:16:08] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:16:09] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:16:09] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:16:09] [Server thread/INFO]: EnemyBot joined the game
+[17:16:09] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:37016] logged in with entity id 236 at ([world]24.5, 77.0, 83.5)
+[17:16:09] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:16:10] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:16:10] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:16:10] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:16:10] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:16:11] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0 65 0
+[17:16:11] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:16:11] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:16:11] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:16:11] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:16:11] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:16:11] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:16:11] [Server thread/INFO]: EnemyBot issued server command: /tp EnemyBot 0 65 5
+[17:16:11] [Server thread/INFO]: [EnemyBot: Teleported EnemyBot to 0.5, 65.0, 5.5]
+[17:16:11] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:16:11] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:16:11] [Server thread/INFO]: EnemyBot issued server command: /clear EnemyBot
+[17:16:11] [Server thread/INFO]: EnemyBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:16:11] [Server thread/INFO]: [EnemyBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:16:11] [Server thread/INFO]: EnemyBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:16:11] [Server thread/INFO]: [EnemyBot: Applied effect Instant Health to EnemyBot]
+[17:16:11] [Server thread/INFO]: EnemyBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:16:11] [Server thread/INFO]: [EnemyBot: Applied effect Saturation to EnemyBot]
+[17:16:11] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:16:11] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:16:11] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:16:11] [Server thread/INFO]: LearnerBot left the game
+[17:16:11] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:16:11] [Server thread/INFO]: EnemyBot left the game
+[17:16:21] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:16:21] [Server thread/INFO]: LearnerBot joined the game
+[17:16:21] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:52698] logged in with entity id 443 at ([world]0.5, 65.0, 0.5)
+[17:16:24] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:16:24] [Server thread/INFO]: LearnerBot left the game
+[17:16:31] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:16:31] [Server thread/INFO]: EnemyBot joined the game
+[17:16:31] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:36956] logged in with entity id 541 at ([world]0.4943863311219143, 65.0, 5.48122110967796)
+[17:16:32] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:16:32] [Server thread/INFO]: EnemyBot left the game
+[17:16:42] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:16:42] [Server thread/INFO]: EnemyBot joined the game
+[17:16:42] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:55356] logged in with entity id 547 at ([world]0.4943863311219143, 65.0, 5.48122110967796)
+[17:16:45] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:16:45] [Server thread/INFO]: EnemyBot left the game
+[17:17:10] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:17:10] [Server thread/INFO]: LearnerBot joined the game
+[17:17:10] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:50450] logged in with entity id 611 at ([world]0.5, 65.0, 0.5)
+[17:17:13] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:17:13] [Server thread/INFO]: LearnerBot left the game
+[17:17:15] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:17:15] [Server thread/INFO]: EnemyBot joined the game
+[17:17:15] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:38850] logged in with entity id 612 at ([world]0.4943863311219143, 65.0, 5.48122110967796)
+[17:17:15] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:17:15] [Server thread/INFO]: EnemyBot left the game
+[17:17:23] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:17:23] [Server thread/INFO]: LearnerBot joined the game
+[17:17:23] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:38862] logged in with entity id 613 at ([world]0.5, 65.0, 0.5)
+[17:17:25] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0 65 0
+[17:17:25] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:17:25] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:17:25] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:17:25] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:17:25] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:17:25] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:17:25] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:17:25] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:17:25] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:17:26] [Server thread/INFO]: LearnerBot lost connection: Disconnected
+[17:17:26] [Server thread/INFO]: LearnerBot left the game
+[17:18:10] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:18:10] [Server thread/INFO]: LearnerBot joined the game
+[17:18:10] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:48740] logged in with entity id 615 at ([world]0.5, 65.0, 0.5)
+[17:18:13] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:18:13] [Server thread/INFO]: LearnerBot left the game
+[17:18:15] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:18:15] [Server thread/INFO]: EnemyBot joined the game
+[17:18:15] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:54650] logged in with entity id 616 at ([world]0.4943863311219143, 65.0, 5.48122110967796)
+[17:18:16] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:18:16] [Server thread/INFO]: EnemyBot left the game
+[17:18:23] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:18:23] [Server thread/INFO]: LearnerBot joined the game
+[17:18:23] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:54658] logged in with entity id 617 at ([world]0.5, 65.0, 0.5)
+[17:18:25] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:18:25] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:18:25] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:18:25] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:18:25] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:18:26] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:18:26] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:18:26] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:18:26] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:18:26] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:18:26] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:18:26] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:18:26] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:18:26] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:18:26] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:18:27] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:18:27] [Server thread/INFO]: LearnerBot left the game
+[17:18:31] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:18:31] [Server thread/INFO]: EnemyBot joined the game
+[17:18:31] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:59426] logged in with entity id 619 at ([world]0.4943863311219143, 65.0, 5.48122110967796)
+[17:18:31] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:18:31] [Server thread/INFO]: EnemyBot left the game
+[17:18:37] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:18:37] [Server thread/INFO]: LearnerBot joined the game
+[17:18:37] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:58990] logged in with entity id 620 at ([world]0.5, 65.0, 0.5)
+[17:18:38] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:18:38] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:18:38] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:18:39] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:18:39] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:18:39] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:18:39] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:18:39] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:18:39] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:18:39] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:18:39] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:18:39] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:18:39] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:18:39] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:18:40] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:18:40] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:18:40] [Server thread/INFO]: LearnerBot left the game
+[17:18:47] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:18:47] [Server thread/INFO]: EnemyBot joined the game
+[17:18:47] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:41902] logged in with entity id 622 at ([world]0.4943863311219143, 65.0, 5.48122110967796)
+[17:18:47] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:18:47] [Server thread/INFO]: EnemyBot left the game
+[17:19:11] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:19:11] [Server thread/INFO]: LearnerBot joined the game
+[17:19:11] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:33718] logged in with entity id 623 at ([world]0.5, 65.0, 0.5)
+[17:19:14] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:19:15] [Server thread/INFO]: [LearnerBot: Successfully filled 3535 blocks]
+[17:19:15] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:19:15] [Server thread/INFO]: [LearnerBot: Successfully filled 275 blocks]
+[17:19:15] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:19:15] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:19:16] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:19:16] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:19:16] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:19:16] [Server thread/INFO]: EnemyBot joined the game
+[17:19:16] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:54608] logged in with entity id 631 at ([world]0.4943863311219143, 65.0, 5.48122110967796)
+[17:19:16] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:19:16] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:19:17] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:19:17] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:19:17] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:19:18] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:19:18] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:19:18] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:19:18] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:19:18] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:19:18] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:19:18] [Server thread/INFO]: [LearnerBot: Removed 1 items from player EnemyBot]
+[17:19:18] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:19:18] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:19:18] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:19:18] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:19:18] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:19:18] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:19:19] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:19:19] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:19:19] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:19:19] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to EnemyBot]
+[17:19:19] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:19:19] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:19:19] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:19:19] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to EnemyBot]
+[17:19:19] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:19:19] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:19:19] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:19:19] [Server thread/INFO]: [LearnerBot: Teleported EnemyBot to 0.5, 65.0, 5.5]
+[17:19:21] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:19:21] [Server thread/INFO]: LearnerBot left the game
+[17:19:21] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:19:21] [Server thread/INFO]: EnemyBot left the game
+[17:19:31] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:19:31] [Server thread/INFO]: LearnerBot joined the game
+[17:19:31] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:53206] logged in with entity id 730 at ([world]0.5, 65.0, 0.5)
+[17:19:33] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:19:33] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:19:33] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:19:33] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:19:33] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:19:33] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:19:33] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:19:33] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:19:33] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:19:34] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:19:34] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:19:34] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:19:34] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:19:34] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:19:34] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:19:36] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:19:36] [Server thread/INFO]: EnemyBot joined the game
+[17:19:36] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:53534] logged in with entity id 732 at ([world]-0.6290793882987744, 65.0, 2.414339043332829)
+[17:19:36] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:19:36] [Server thread/INFO]: LearnerBot left the game
+[17:19:37] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:19:37] [Server thread/INFO]: EnemyBot left the game
+[17:19:47] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:19:47] [Server thread/INFO]: LearnerBot joined the game
+[17:19:47] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:45456] logged in with entity id 733 at ([world]0.5, 65.0, 0.5)
+[17:19:48] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:19:48] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:19:48] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:19:48] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:19:48] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:19:49] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:19:49] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:19:49] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:19:49] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:19:49] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:19:49] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:19:49] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:19:49] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:19:49] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:19:50] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:19:51] [Server thread/INFO]: LearnerBot lost connection: Disconnected
+[17:19:51] [Server thread/INFO]: LearnerBot left the game
+[17:20:01] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:20:01] [Server thread/INFO]: LearnerBot joined the game
+[17:20:01] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:38880] logged in with entity id 735 at ([world]0.5, 65.0, 0.5)
+[17:20:05] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:20:05] [Server thread/INFO]: [LearnerBot: Successfully filled 481 blocks]
+[17:20:05] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:20:06] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:20:06] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:20:06] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:20:06] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:20:06] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:20:06] [Server thread/INFO]: EnemyBot joined the game
+[17:20:06] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:33990] logged in with entity id 736 at ([world]-0.6290793882987744, 65.0, 2.414339043332829)
+[17:20:07] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:20:07] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:20:07] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:20:07] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:20:08] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:20:08] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:20:08] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:20:08] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:20:08] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:20:08] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:20:08] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:20:08] [Server thread/INFO]: [LearnerBot: Removed 1 items from player EnemyBot]
+[17:20:08] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:20:08] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:20:09] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:20:09] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:20:09] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:20:09] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to EnemyBot]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:20:09] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:20:09] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to EnemyBot]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:20:09] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:20:09] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:20:09] [Server thread/INFO]: [LearnerBot: Teleported EnemyBot to 0.5, 65.0, 5.5]
+[17:20:11] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:20:11] [Server thread/INFO]: LearnerBot left the game
+[17:20:11] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:20:11] [Server thread/INFO]: EnemyBot left the game
+[17:20:21] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:20:21] [Server thread/INFO]: LearnerBot joined the game
+[17:20:21] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:43080] logged in with entity id 743 at ([world]0.5, 65.0, 0.5)
+[17:20:23] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:20:23] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:20:23] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:20:23] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:20:23] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:20:23] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:20:24] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:20:24] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:20:24] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:20:24] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:20:24] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:20:24] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:20:24] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:20:24] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:20:24] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:20:26] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:20:26] [Server thread/INFO]: EnemyBot joined the game
+[17:20:26] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:56146] logged in with entity id 745 at ([world]0.5417145421557319, 65.0, 2.7017709500838545)
+[17:20:27] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:20:27] [Server thread/INFO]: LearnerBot left the game
+[17:20:27] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:20:27] [Server thread/INFO]: EnemyBot left the game
+[17:20:37] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:20:37] [Server thread/INFO]: LearnerBot joined the game
+[17:20:37] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:52568] logged in with entity id 746 at ([world]0.5, 65.0, 0.5)
+[17:20:39] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:20:39] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:20:39] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:20:39] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:20:39] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:20:39] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:20:39] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:20:39] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:20:39] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:20:39] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:20:39] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:20:40] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:20:40] [Server thread/INFO]: LearnerBot issued server command: /tp LearnerBot 0.5 65 0.5 0 0
+[17:20:40] [Server thread/INFO]: [LearnerBot: Teleported LearnerBot to 0.5, 65.0, 0.5]
+[17:20:40] [Server thread/INFO]: LearnerBot issued server command: /tp EnemyBot 0.5 65 5.5 180 0
+[17:20:42] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:20:42] [Server thread/INFO]: EnemyBot joined the game
+[17:20:42] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:52576] logged in with entity id 748 at ([world]0.971873836288738, 65.0, 2.696383402478316)
+[17:20:42] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:20:42] [Server thread/INFO]: LearnerBot left the game
+[17:20:43] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:20:43] [Server thread/INFO]: EnemyBot left the game
+[17:21:04] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:21:04] [Server thread/INFO]: LearnerBot joined the game
+[17:21:04] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:36100] logged in with entity id 749 at ([world]0.5, 65.0, 0.5)
+[17:21:07] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:21:07] [Server thread/INFO]: [LearnerBot: Successfully filled 481 blocks]
+[17:21:07] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:21:08] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:21:08] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:21:08] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:21:08] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:21:09] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:21:09] [Server thread/INFO]: EnemyBot joined the game
+[17:21:09] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:49532] logged in with entity id 750 at ([world]0.971873836288738, 65.0, 2.696383402478316)
+[17:21:09] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:21:09] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:21:09] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:21:09] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:21:10] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:21:10] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:21:10] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:21:10] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:21:10] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:21:10] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:21:11] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:21:11] [Server thread/INFO]: [LearnerBot: Removed 1 items from player EnemyBot]
+[17:21:11] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:21:11] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:21:11] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:21:11] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 5 [0.0] in minecraft:overworld for EnemyBot]
+[17:21:11] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:21:11] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:21:11] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:21:11] [Server thread/INFO]: LearnerBot didn't want to live in the same world as EnemyBot
+[17:21:11] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:21:11] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:21:11] [Server thread/INFO]: EnemyBot fell out of the world
+[17:21:11] [Server thread/INFO]: [LearnerBot: Killed EnemyBot]
+[17:21:12] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:21:12] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:21:12] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:21:12] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:21:13] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:21:13] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:21:13] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:21:13] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to EnemyBot]
+[17:21:14] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:21:14] [Server thread/INFO]: LearnerBot left the game
+[17:21:14] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:21:14] [Server thread/INFO]: EnemyBot left the game
+[17:21:24] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:21:24] [Server thread/INFO]: LearnerBot joined the game
+[17:21:24] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:48114] logged in with entity id 753 at ([world]0.5, 65.0, 0.5)
+[17:21:26] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:21:26] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:21:26] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:21:26] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:21:26] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:21:26] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:21:26] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:21:26] [Server thread/INFO]: LearnerBot fell out of the world
+[17:21:26] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:21:26] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:21:26] [Server thread/INFO]: LearnerBot left the game
+[17:21:29] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:21:29] [Server thread/INFO]: EnemyBot joined the game
+[17:21:29] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:36428] logged in with entity id 754 at ([world]0.10548611577728118, 65.0, 2.6947579152936685)
+[17:21:32] [Server thread/INFO]: EnemyBot lost connection: Disconnected
+[17:21:32] [Server thread/INFO]: EnemyBot left the game
+[17:21:51] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:21:51] [Server thread/INFO]: LearnerBot joined the game
+[17:21:51] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:46252] logged in with entity id 755 at ([world]0.5, 65.1, 0.5)
+[17:21:54] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:21:54] [Server thread/INFO]: [LearnerBot: Successfully filled 482 blocks]
+[17:21:54] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:21:55] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:21:55] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:21:55] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:21:55] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:21:56] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:21:56] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:21:56] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:21:56] [Server thread/INFO]: EnemyBot joined the game
+[17:21:56] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:41004] logged in with entity id 756 at ([world]2.503699382072289, 66.08639997415543, 1.7244574707195057)
+[17:21:56] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:21:56] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:21:57] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:21:57] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:21:57] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:21:57] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:21:57] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:21:57] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:21:57] [Server thread/INFO]: [LearnerBot: Removed 1 items from player EnemyBot]
+[17:21:58] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:21:58] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:21:58] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:21:58] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 5 [0.0] in minecraft:overworld for EnemyBot]
+[17:21:58] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:21:58] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:21:58] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:21:58] [Server thread/INFO]: LearnerBot didn't want to live in the same world as EnemyBot
+[17:21:58] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:21:58] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:21:58] [Server thread/INFO]: EnemyBot fell out of the world
+[17:21:58] [Server thread/INFO]: [LearnerBot: Killed EnemyBot]
+[17:21:59] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:21:59] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:21:59] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:21:59] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:21:59] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:21:59] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:22:00] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:22:00] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to EnemyBot]
+[17:22:01] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:22:01] [Server thread/INFO]: LearnerBot left the game
+[17:22:01] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:22:01] [Server thread/INFO]: EnemyBot left the game
+[17:22:11] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:22:11] [Server thread/INFO]: LearnerBot joined the game
+[17:22:11] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:42390] logged in with entity id 759 at ([world]0.5, 65.0, 0.5)
+[17:22:13] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:22:13] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:22:13] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:22:13] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:22:13] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:22:13] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:22:13] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:22:13] [Server thread/INFO]: LearnerBot fell out of the world
+[17:22:13] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:22:13] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:22:14] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:22:14] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:22:15] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:22:15] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:22:15] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:22:15] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:22:16] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:22:16] [Server thread/INFO]: EnemyBot joined the game
+[17:22:16] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:34562] logged in with entity id 761 at ([world]0.3675297418696516, 65.0, 2.4485816177426147)
+[17:22:16] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:22:16] [Server thread/INFO]: LearnerBot left the game
+[17:22:17] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:22:17] [Server thread/INFO]: EnemyBot left the game
+[17:22:27] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:22:27] [Server thread/INFO]: LearnerBot joined the game
+[17:22:27] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:49272] logged in with entity id 762 at ([world]0.5, 65.0, 0.5)
+[17:22:28] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:22:28] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:22:28] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:22:29] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:22:29] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:22:29] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:22:29] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:22:29] [Server thread/INFO]: LearnerBot fell out of the world
+[17:22:29] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:22:29] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:22:30] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:22:30] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:22:30] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:22:30] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:22:30] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:22:31] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:22:32] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:22:32] [Server thread/INFO]: EnemyBot joined the game
+[17:22:32] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:49280] logged in with entity id 764 at ([world]0.3675297418696516, 65.0, 2.4485816177426147)
+[17:22:32] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:22:32] [Server thread/INFO]: LearnerBot left the game
+[17:22:32] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:22:32] [Server thread/INFO]: EnemyBot left the game
+[17:22:47] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:22:47] [Server thread/INFO]: LearnerBot joined the game
+[17:22:47] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:34528] logged in with entity id 765 at ([world]0.5, 65.0, 0.5)
+[17:22:50] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:22:50] [Server thread/INFO]: [LearnerBot: Successfully filled 480 blocks]
+[17:22:51] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:22:51] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:22:51] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:22:52] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:22:52] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:22:52] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:22:52] [Server thread/INFO]: EnemyBot joined the game
+[17:22:52] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:34536] logged in with entity id 766 at ([world]0.3675297418696516, 65.0, 2.4485816177426147)
+[17:22:52] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:22:52] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:22:53] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:22:53] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:22:53] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:22:53] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:22:54] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:22:54] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:22:54] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:22:54] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:22:54] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:22:54] [Server thread/INFO]: [LearnerBot: Removed 1 items from player EnemyBot]
+[17:22:54] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:22:54] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:22:54] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:22:54] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 5 [0.0] in minecraft:overworld for EnemyBot]
+[17:22:54] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:22:54] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:22:54] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:22:54] [Server thread/INFO]: LearnerBot didn't want to live in the same world as EnemyBot
+[17:22:54] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:22:55] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:22:55] [Server thread/INFO]: EnemyBot fell out of the world
+[17:22:55] [Server thread/INFO]: [LearnerBot: Killed EnemyBot]
+[17:22:56] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:22:56] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:22:56] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:22:56] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:22:56] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:22:56] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:22:56] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:22:56] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to EnemyBot]
+[17:22:57] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:22:57] [Server thread/INFO]: LearnerBot left the game
+[17:22:58] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:22:58] [Server thread/INFO]: EnemyBot left the game
+[17:23:08] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:23:08] [Server thread/INFO]: LearnerBot joined the game
+[17:23:08] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:46136] logged in with entity id 769 at ([world]0.5, 65.0, 0.5)
+[17:23:09] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:23:09] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:23:09] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:23:09] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:23:09] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:23:10] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:23:10] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:23:10] [Server thread/INFO]: LearnerBot fell out of the world
+[17:23:10] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:23:10] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:23:11] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:23:11] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:23:11] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:23:11] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:23:11] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:23:11] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:23:13] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:23:13] [Server thread/INFO]: EnemyBot joined the game
+[17:23:13] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:46150] logged in with entity id 772 at ([world]0.4999999999998238, 65.0, 2.3924981595681496)
+[17:23:13] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:23:13] [Server thread/INFO]: LearnerBot left the game
+[17:23:13] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:23:13] [Server thread/INFO]: EnemyBot left the game
+[17:23:31] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:23:31] [Server thread/INFO]: LearnerBot joined the game
+[17:23:31] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:32822] logged in with entity id 773 at ([world]0.5, 65.0, 0.5)
+[17:23:34] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:23:34] [Server thread/INFO]: [LearnerBot: Successfully filled 480 blocks]
+[17:23:34] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:23:35] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:23:35] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:23:35] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:23:35] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:23:36] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:23:36] [Server thread/INFO]: EnemyBot joined the game
+[17:23:36] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:47312] logged in with entity id 774 at ([world]0.5570359999998238, 65.0, 2.3924981595681496)
+[17:23:36] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:23:36] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:23:36] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:23:36] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:23:37] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:23:37] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:23:37] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:23:37] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:23:37] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:23:37] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:23:38] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:23:38] [Server thread/INFO]: [LearnerBot: Removed 1 items from player EnemyBot]
+[17:23:38] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:23:38] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:23:38] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:23:38] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 5 [0.0] in minecraft:overworld for EnemyBot]
+[17:23:38] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:23:38] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:23:38] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:23:38] [Server thread/INFO]: LearnerBot didn't want to live in the same world as EnemyBot
+[17:23:38] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:23:38] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:23:38] [Server thread/INFO]: EnemyBot fell out of the world
+[17:23:38] [Server thread/INFO]: [LearnerBot: Killed EnemyBot]
+[17:23:39] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:23:39] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:23:39] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:23:39] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:23:40] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:23:40] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:23:40] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:23:40] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to EnemyBot]
+[17:23:41] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:23:41] [Server thread/INFO]: LearnerBot left the game
+[17:23:41] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:23:41] [Server thread/INFO]: EnemyBot left the game
+[17:23:51] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:23:51] [Server thread/INFO]: LearnerBot joined the game
+[17:23:51] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:48450] logged in with entity id 777 at ([world]0.5, 65.0, 0.5)
+[17:23:53] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:23:53] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:23:53] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:23:53] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:23:53] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:23:53] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:23:53] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:23:53] [Server thread/INFO]: LearnerBot fell out of the world
+[17:23:53] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:23:53] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:23:54] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:23:54] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:23:55] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:23:55] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:23:55] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:23:55] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:23:56] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:23:56] [Server thread/INFO]: EnemyBot joined the game
+[17:23:56] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:42726] logged in with entity id 779 at ([world]0.4008930909652371, 65.0, 2.8479023781662796)
+[17:23:57] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:23:57] [Server thread/INFO]: LearnerBot left the game
+[17:23:57] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:23:57] [Server thread/INFO]: EnemyBot left the game
+[17:24:07] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:24:07] [Server thread/INFO]: LearnerBot joined the game
+[17:24:07] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:47312] logged in with entity id 780 at ([world]0.5, 65.0, 0.5)
+[17:24:08] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:24:08] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:24:08] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:24:08] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint LearnerBot 0 65 0
+[17:24:08] [Server thread/INFO]: [LearnerBot: Set spawn point to 0, 65, 0 [0.0] in minecraft:overworld for LearnerBot]
+[17:24:09] [Server thread/INFO]: LearnerBot issued server command: /spawnpoint EnemyBot 0 65 5
+[17:24:09] [Server thread/INFO]: LearnerBot issued server command: /kill LearnerBot
+[17:24:09] [Server thread/INFO]: LearnerBot fell out of the world
+[17:24:09] [Server thread/INFO]: [LearnerBot: Killed LearnerBot]
+[17:24:09] [Server thread/INFO]: LearnerBot issued server command: /kill EnemyBot
+[17:24:10] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:24:10] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:24:10] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:24:10] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:24:10] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:24:10] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:24:12] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:24:12] [Server thread/INFO]: EnemyBot joined the game
+[17:24:12] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:47328] logged in with entity id 782 at ([world]-0.02896105908275476, 65.0, 2.83559091548362)
+[17:24:12] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:24:12] [Server thread/INFO]: LearnerBot left the game
+[17:24:12] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:24:12] [Server thread/INFO]: EnemyBot left the game
+[17:24:28] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:24:28] [Server thread/INFO]: LearnerBot joined the game
+[17:24:28] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:47936] logged in with entity id 783 at ([world]0.5, 65.0, 0.5)
+[17:24:31] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:24:31] [Server thread/INFO]: [LearnerBot: Successfully filled 480 blocks]
+[17:24:32] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:24:32] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:24:32] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:24:33] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:24:33] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:24:33] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:24:33] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:24:33] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:24:33] [Server thread/INFO]: EnemyBot joined the game
+[17:24:33] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:47940] logged in with entity id 784 at ([world]-0.02896105908275476, 65.0, 2.83559091548362)
+[17:24:34] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 10 10 70 10 minecraft:bedrock
+[17:24:34] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:24:34] [Server thread/INFO]: LearnerBot issued server command: /gamerule doMobSpawning false
+[17:24:34] [Server thread/INFO]: [LearnerBot: Gamerule doMobSpawning is now set to: false]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /time set day
+[17:24:35] [Server thread/INFO]: [LearnerBot: Set the time to 1000]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:24:35] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:24:35] [Server thread/INFO]: [LearnerBot: Removed 1 items from player EnemyBot]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:24:35] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:24:35] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to EnemyBot]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:24:35] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /weather clear
+[17:24:35] [Server thread/INFO]: [LearnerBot: Set the weather to clear]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:24:35] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to EnemyBot]
+[17:24:35] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:24:35] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:24:36] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:24:36] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to EnemyBot]
+[17:24:36] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:24:36] [Server thread/INFO]: LearnerBot left the game
+[17:24:36] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:24:36] [Server thread/INFO]: EnemyBot left the game
+[17:24:46] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:24:46] [Server thread/INFO]: LearnerBot joined the game
+[17:24:46] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:51500] logged in with entity id 787 at ([world]0.5, 65.0, 0.5)
+[17:24:48] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:24:48] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:24:48] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:24:48] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:24:48] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:24:48] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:24:48] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:24:48] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:24:49] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:24:49] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:24:49] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:24:49] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:24:52] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:24:52] [Server thread/INFO]: EnemyBot joined the game
+[17:24:52] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:51508] logged in with entity id 789 at ([world]-0.6937716474572555, 65.0, 2.0312852228218556)
+[17:24:52] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:24:52] [Server thread/INFO]: LearnerBot left the game
+[17:24:52] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:24:52] [Server thread/INFO]: EnemyBot left the game
+[17:25:04] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:25:04] [Server thread/INFO]: LearnerBot joined the game
+[17:25:04] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:50510] logged in with entity id 790 at ([world]0.5, 65.0, 0.5)
+[17:25:07] [Server thread/INFO]: LearnerBot issued server command: /fill -11 65 -11 11 80 11 minecraft:air
+[17:25:07] [Server thread/INFO]: [LearnerBot: Successfully filled 480 blocks]
+[17:25:07] [Server thread/INFO]: LearnerBot issued server command: /fill -10 64 -10 10 64 10 minecraft:stone
+[17:25:08] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 -10 70 10 minecraft:bedrock
+[17:25:08] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:25:08] [Server thread/INFO]: LearnerBot issued server command: /fill 10 65 -10 10 70 10 minecraft:bedrock
+[17:25:08] [Server thread/INFO]: [LearnerBot: Successfully filled 126 blocks]
+[17:25:09] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:25:09] [Server thread/INFO]: EnemyBot joined the game
+[17:25:09] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:51562] logged in with entity id 791 at ([world]-0.6937716474572555, 65.0, 2.0312852228218556)
+[17:25:09] [Server thread/INFO]: LearnerBot issued server command: /fill -10 65 -10 10 70 -10 minecraft:bedrock
+[17:25:09] [Server thread/INFO]: [LearnerBot: Successfully filled 114 blocks]
+[17:25:09] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:25:09] [Server thread/INFO]: LearnerBot left the game
+[17:25:09] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:25:09] [Server thread/INFO]: EnemyBot left the game
+[17:25:19] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:25:19] [Server thread/INFO]: LearnerBot joined the game
+[17:25:19] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:57486] logged in with entity id 792 at ([world]0.5, 65.0, 0.5)
+[17:25:21] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:25:21] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:25:21] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:25:21] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:25:21] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:25:21] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:25:21] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:25:21] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:25:21] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:25:21] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:25:21] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:25:22] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:25:24] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:25:25] [Server thread/INFO]: EnemyBot joined the game
+[17:25:25] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:60168] logged in with entity id 794 at ([world]-0.6937716474572555, 65.0, 2.0312852228218556)
+[17:25:25] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:25:25] [Server thread/INFO]: LearnerBot left the game
+[17:25:25] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:25:25] [Server thread/INFO]: EnemyBot left the game
+[17:25:35] [User Authenticator #1/INFO]: UUID of player LearnerBot is 23b95b27-c1ca-34d4-814c-c031f966a195
+[17:25:35] [Server thread/INFO]: LearnerBot joined the game
+[17:25:35] [Server thread/INFO]: LearnerBot[/0:0:0:0:0:0:0:1%0:55174] logged in with entity id 795 at ([world]0.5, 65.0, 0.5)
+[17:25:36] [Server thread/INFO]: LearnerBot issued server command: /clear LearnerBot
+[17:25:36] [Server thread/INFO]: [LearnerBot: Removed 1 items from player LearnerBot]
+[17:25:37] [Server thread/INFO]: LearnerBot issued server command: /clear EnemyBot
+[17:25:37] [Server thread/INFO]: LearnerBot issued server command: /give LearnerBot minecraft:diamond_sword 1
+[17:25:37] [Server thread/INFO]: [LearnerBot: Gave 1 [Diamond Sword] to LearnerBot]
+[17:25:37] [Server thread/INFO]: LearnerBot issued server command: /give EnemyBot minecraft:diamond_sword 1
+[17:25:37] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:instant_health 1 10 true
+[17:25:37] [Server thread/INFO]: [LearnerBot: Applied effect Instant Health to LearnerBot]
+[17:25:37] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:instant_health 1 10 true
+[17:25:37] [Server thread/INFO]: LearnerBot issued server command: /effect give LearnerBot minecraft:saturation 1 10 true
+[17:25:37] [Server thread/INFO]: [LearnerBot: Applied effect Saturation to LearnerBot]
+[17:25:37] [Server thread/INFO]: LearnerBot issued server command: /effect give EnemyBot minecraft:saturation 1 10 true
+[17:25:40] [User Authenticator #1/INFO]: UUID of player EnemyBot is 461da519-6747-3593-ac2c-ddf98075b053
+[17:25:40] [Server thread/INFO]: EnemyBot joined the game
+[17:25:40] [Server thread/INFO]: EnemyBot[/0:0:0:0:0:0:0:1%0:55178] logged in with entity id 797 at ([world]-0.6937716474572555, 65.0, 2.0312852228218556)
+[17:25:40] [Server thread/INFO]: LearnerBot lost connection: Invalid move player packet received
+[17:25:40] [Server thread/INFO]: LearnerBot left the game
+[17:25:40] [Server thread/INFO]: EnemyBot lost connection: Invalid move player packet received
+[17:25:40] [Server thread/INFO]: EnemyBot left the game
+[17:25:49] [Server thread/INFO]: Stopping server
+[17:25:49] [Server thread/INFO]: Saving players
+[17:25:49] [Server thread/INFO]: Saving worlds
+[17:25:49] [Server thread/INFO]: Saving chunks for level 'ServerLevel[world]'/minecraft:overworld
+[17:25:50] [Server thread/INFO]: ThreadedAnvilChunkStorage (world): All chunks are saved
+[17:25:50] [Server thread/INFO]: Saving chunks for level 'ServerLevel[world_nether]'/minecraft:the_nether
+[17:25:51] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[17:25:51] [Server thread/INFO]: Saving chunks for level 'ServerLevel[world_the_end]'/minecraft:the_end
+[17:25:51] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[17:25:51] [Server thread/INFO]: ThreadedAnvilChunkStorage (world): All chunks are saved
+[17:25:51] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[17:25:51] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[17:25:51] [Server thread/INFO]: Flushing Chunk IO
+[17:25:51] [Server thread/INFO]: Closing Thread Pool
+[17:25:51] [Server thread/INFO]: Closing Server
