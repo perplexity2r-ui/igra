@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+bot/node_modules/
+npm-debug.log*
+
+# Training checkpoints & TensorBoard logs (keep models/pvp_ppo_latest.zip tracked)
+models/checkpoints/
+models/backups/
+tensorboard/
+
+# Minecraft runtime locks & Paper jar
+*.jar
+cache/
+libraries/
+crash-reports/
+timings/
+world/session.lock
+world_nether/session.lock
+world_the_end/session.lock
+logs/*.log.gz
+
+# PRO training checkpoints
+models/pro_checkpoints/

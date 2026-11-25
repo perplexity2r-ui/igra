@@ -2,10 +2,14 @@
   "name": "minecraft-pvp-bot",
   "version": "1.0.0",
   "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "mock-server": "node mock_server.js"
+  },
   "dependencies": {
-    "minecraft-protocol": "1.47.0",
-    "mineflayer": "4.20.1",
-    "prismarine-physics": "1.8.0",
-    "ws": "^8.17.0"
+    "minecraft-protocol": "^1.68.0",
+    "mineflayer": "^4.39.0",
+    "prismarine-physics": "^1.11.1",
+    "ws": "^8.23.0"
   }
 }
