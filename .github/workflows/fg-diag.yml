@@ -24,31 +24,30 @@ jobs:
         with:
           gradle-version: '7.1.1'
 
-      - name: Collect info
-        working-directory: forge-mod
+      - name: Inspect jars
         shell: bash
         run: |
+          cd forge-mod
+          gradle -q dependencies --configuration compileClasspath --no-daemon > /dev/null 2>&1 || true
+          J=/home/runner/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.16.5-36.2.39_mapped_snapshot_20210309-1.16.5/forge-1.16.5-36.2.39_mapped_snapshot_20210309-1.16.5.jar
           {
-            echo "===== gradle --version"
-            gradle --version 2>&1
-            echo
-            echo "===== compileClasspath"
-            gradle -q dependencies --configuration compileClasspath --no-daemon 2>&1
-            echo
-            echo "===== configurations list"
-            gradle -q properties --no-daemon 2>&1 | head -60
-            echo
-            echo "===== tasks (forge-related)"
-            gradle -q tasks --all --no-daemon 2>&1 | grep -iE "reobf|minecraft|mapping|extract" | head -30
-          } > diag.txt 2>&1
-          cp diag.txt ../diag.txt
+            echo "jar exists:"; ls -la "$J"
+            echo "total entries:"; unzip -l "$J" | tail -2
+            echo "net/minecraft entries:"; unzip -l "$J" | grep -c "net/minecraft/"
+            echo "sample:"; unzip -l "$J" | grep "net/minecraft/" | head -10
+            echo "LivingEntity?"; unzip -l "$J" | grep -c "LivingEntity.class"
+            echo "--- FG version resolved:"
+            grep -rn "ForgeGradle" build.gradle
+            echo "--- java version used by gradle daemon:"
+            gradle -q javaToolchains --no-daemon 2>&1 | head -20 || true
+          } > ../diag.txt 2>&1
 
       - name: Publish diag
         shell: bash
         run: |
           git config user.name "ci-bot"
           git config user.email "ci@users.noreply.github.com"
-          git checkout -q -B fg-diag
+          git checkout -q -B fg-diag2
           git add -f diag.txt
-          git commit -q -m "FG diagnostics" || echo none
-          git push -f origin fg-diag
+          git commit -q -m "FG diagnostics 2" || echo none
+          git push -f origin fg-diag2
