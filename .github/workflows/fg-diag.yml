@@ -1,0 +1,60 @@
+name: FG diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fg-diag.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '7.6.4'
+
+      - name: Inspect
+        shell: bash
+        run: |
+          set +e
+          cd forge-mod
+          gradle dependencies --configuration compileClasspath --no-daemon > /tmp/deps.log 2>&1
+          J=/home/runner/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.16.5-36.2.39_mapped_snapshot_20210309-1.16.5/forge-1.16.5-36.2.39_mapped_snapshot_20210309-1.16.5.jar
+          {
+            echo "### ls"
+            ls -la "$J"
+            echo "### entry count"
+            unzip -l "$J" 2>&1 | tail -3
+            echo "### net/minecraft count"
+            unzip -l "$J" 2>&1 | grep "net/minecraft/" | wc -l
+            echo "### first 15 entries"
+            unzip -l "$J" 2>&1 | head -25
+            echo "### net/minecraftforge count"
+            unzip -l "$J" 2>&1 | grep -c "net/minecraftforge/"
+            echo "### raw srg jar"
+            ls -la /home/runner/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.16.5-36.2.39/ 2>&1
+            echo "### deps tail"
+            tail -40 /tmp/deps.log
+            echo "### compile classpath task"
+            gradle -q properties --no-daemon 2>&1 | grep -iE "sourceCompat|targetCompat" | head
+          } > ../diag.txt 2>&1
+          cd ..
+
+      - name: Publish
+        shell: bash
+        run: |
+          git config user.name "ci-bot"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout -q -B fg-diag3
+          git add -f diag.txt
+          git commit -q -m "FG diagnostics 3" || echo none
+          git push -f origin fg-diag3
