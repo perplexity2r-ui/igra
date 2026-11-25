@@ -8,6 +8,9 @@ on:
       - '.github/workflows/forge-mod.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,32 +38,30 @@ jobs:
           set -o pipefail
           gradle build --no-daemon --stacktrace -x test 2>&1 | tee build.log
 
-      - name: Publish log to ci-logs branch on failure
-        if: steps.buildstep.outcome == 'failure'
+      - name: Publish result branch
         working-directory: forge-mod
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
-          cp build.log ../build-failure.log
+          set -e
           cd ..
           git config user.name "ci-bot"
           git config user.email "ci@users.noreply.github.com"
-          git checkout -q -B ci-logs || exit 0
-          git add -f build-failure.log
-          git commit -q -m "CI build failure ${GITHUB_RUN_ID}" || exit 0
-          git push -q -f origin ci-logs || exit 0
+          BRANCH=forge-dist
+          if [ "${{ steps.buildstep.outcome }}" = "success" ]; then
+            mkdir -p dist
+            cp forge-mod/build/libs/*.jar dist/aipilot-1.16.5.jar
+            cp forge-mod/build.log dist/build.log
+            MSG="AI Pilot build OK (${GITHUB_SHA::7})"
+          else
+            mkdir -p dist
+            cp forge-mod/build.log dist/build.log
+            MSG="AI Pilot build FAILED (${GITHUB_SHA::7})"
+          fi
+          git checkout -q -B $BRANCH
+          git add -f dist
+          git commit -q -m "$MSG" || echo "nothing to commit"
+          git push -f origin $BRANCH
 
       - name: Fail job if build failed
         if: steps.buildstep.outcome == 'failure'
         run: exit 1
-
-      - name: Show output
-        working-directory: forge-mod
-        run: ls -la build/libs
-
-      - name: Upload jar
-        uses: actions/upload-artifact@v4
-        with:
-          name: aipilot-jar
-          path: forge-mod/build/libs/*.jar
-          if-no-files-found: error
