@@ -1,11 +1,7 @@
 package com.arena.aipilot;
 
-import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.command.CommandSource;
-import net.minecraft.command.Commands;
-import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraftforge.client.event.InputUpdateEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
@@ -24,11 +20,8 @@ import org.lwjgl.glfw.GLFW;
  *
  * Управление:
  *   O      — включить/выключить автобой
- *   R      — режим «выйти из комбо» (короткий рывок назад + щит + разворот)
  *   J      — включить/выключить HUD
  *   K      — переключить стиль боя (AGGRO / BALANCED / SAFE)
- *   .aip   — команда настроек (без слэша, как обычный чат-ввод не работает —
- *            используйте клиентскую команду "/aip ...")
  */
 @Mod(AiPilot.MOD_ID)
 @Mod.EventBusSubscriber(modid = AiPilot.MOD_ID, value = net.minecraftforge.api.distmarker.Dist.CLIENT,
@@ -64,7 +57,7 @@ public class AiPilot {
     public static void chat(String msg) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.sendMessage(new StringTextComponent(msg), mc.player.getUUID());
+            mc.player.displayClientMessage(new TextComponent(msg), false);
         }
     }
 
@@ -110,42 +103,4 @@ public class AiPilot {
         AiPilotEngine.renderHud(event);
     }
 
-    // ---------------------------------------------------------------- commands
-    @Mod.EventBusSubscriber(modid = MOD_ID, value = net.minecraftforge.api.distmarker.Dist.CLIENT)
-    public static class Commands_ {
-        @SubscribeEvent
-        public static void register(net.minecraftforge.client.event.RegisterClientCommandsEvent event) {
-            event.getDispatcher().register(
-                Commands.literal("aip")
-                    .then(Commands.literal("on").executes(c -> { setEnabled(true); return 1; }))
-                    .then(Commands.literal("off").executes(c -> { setEnabled(false); return 1; }))
-                    .then(Commands.literal("style")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                            .executes(c -> {
-                                AiPilotEngine.setStyle(StringArgumentType.getString(c, "name"));
-                                return 1;
-                            })))
-                    .then(Commands.literal("range")
-                        .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(1.0, 6.0))
-                            .executes(c -> {
-                                AiPilotEngine.setRange(DoubleArgumentType.getDouble(c, "blocks"));
-                                return 1;
-                            })))
-                    .then(Commands.literal("crit")
-                        .then(Commands.argument("on", DoubleArgumentType.doubleArg(0.0, 1.0))
-                            .executes(c -> {
-                                AiPilotEngine.setCrit(DoubleArgumentType.getDouble(c, "on") > 0.5);
-                                return 1;
-                            })))
-                    .executes(c -> {
-                        Chat(c.getSource(), AiPilotEngine.statusLine());
-                        return 1;
-                    })
-            );
-        }
-
-        private static void Chat(CommandSource src, String msg) {
-            src.sendSuccess(new StringTextComponent(msg), false);
-        }
-    }
 }

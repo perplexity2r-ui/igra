@@ -12,15 +12,14 @@ import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemCooldowns;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.TridentItem;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.util.MovementInput;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.client.player.Input;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 
 import java.util.List;
@@ -362,7 +361,7 @@ public final class AiPilotEngine {
      * Перехват управления: пока автобой включён, ванильные клавиши игнорируются,
      * а в игру уходят только интенты «мозга». Клиент штатно отправит их на сервер.
      */
-    public static void overrideInputs(MovementInput in) {
+    public static void overrideInputs(Input in) {
         if (!AiPilot.isEnabled() || in == null) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
@@ -381,29 +380,29 @@ public final class AiPilotEngine {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer p = mc.player;
         if (p == null) return;
-        List<ITextComponent> lines = event.getLeft();
+        List<Component> lines = event.getLeft();
         ChatFormatting stateColor = AiPilot.isEnabled() ? ChatFormatting.GREEN : ChatFormatting.RED;
-        lines.add(new StringTextComponent("").append(
-                new StringTextComponent("AI Pilot ").withStyle(ChatFormatting.AQUA))
-                .append(new StringTextComponent(AiPilot.isEnabled() ? "ON" : "OFF").withStyle(stateColor))
-                .append(new StringTextComponent("  [" + style.label + "]").withStyle(ChatFormatting.GRAY)));
+        lines.add(new TextComponent("").append(
+                new TextComponent("AI Pilot ").withStyle(ChatFormatting.AQUA))
+                .append(new TextComponent(AiPilot.isEnabled() ? "ON" : "OFF").withStyle(stateColor))
+                .append(new TextComponent("  [" + style.label + "]").withStyle(ChatFormatting.GRAY)));
 
         if (AiPilot.isEnabled() && target != null) {
             double d = p.distanceTo(target);
             String hp = String.format(Locale.ROOT, "%.1f", target.getHealth());
-            lines.add(new StringTextComponent(
+            lines.add(new TextComponent(
                     "  target: " + target.getName().getString() + "  " + hp + " HP  "
                             + String.format(Locale.ROOT, "%.1f", d) + "m")
                     .withStyle(ChatFormatting.YELLOW));
             int charge = Math.round(p.getAttackStrengthScale(0.5F) * 100.0F);
-            lines.add(new StringTextComponent("  charge: " + charge + "%")
+            lines.add(new TextComponent("  charge: " + charge + "%")
                     .withStyle(charge > 95 ? ChatFormatting.GREEN : ChatFormatting.GRAY));
             if (escapeTicks > 0) {
-                lines.add(new StringTextComponent("  \u21B3 escape combo (backpedal + shield)")
+                lines.add(new TextComponent("  \u21B3 escape combo (backpedal + shield)")
                         .withStyle(ChatFormatting.LIGHT_PURPLE));
             }
         } else if (AiPilot.isEnabled()) {
-            lines.add(new StringTextComponent("  no target in " + (int) searchRange + "m")
+            lines.add(new TextComponent("  no target in " + (int) searchRange + "m")
                     .withStyle(ChatFormatting.DARK_GRAY));
         }
     }
