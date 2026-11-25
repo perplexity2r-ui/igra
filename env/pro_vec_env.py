@@ -105,24 +105,32 @@ class BotArrays:
         self.y = np.zeros(n, f)
         self.vy = np.zeros(n, f)
 
+        # manual overrides (set for a human-controlled player)
+        self.force_weapon = np.full(n, -1, np.int32)
+        self.force_armor = np.full(n, -1, np.int32)
+
     # convenience derived values -------------------------------------------------
+    def _idx(self, arr: np.ndarray) -> np.ndarray:
+        return np.where(self.force_weapon >= 0, self.force_weapon, arr)
+
     def dmg(self) -> np.ndarray:
-        return WEAPON_DMG[self.weapon]
+        return WEAPON_DMG[self._idx(self.weapon)]
 
     def cd_time(self) -> np.ndarray:
-        return WEAPON_CD[self.weapon]
+        return WEAPON_CD[self._idx(self.weapon)]
 
     def kb_mult(self) -> np.ndarray:
-        return WEAPON_KB[self.weapon]
+        return WEAPON_KB[self._idx(self.weapon)]
 
     def is_axe(self) -> np.ndarray:
-        return WEAPON_AXE[self.weapon] > 0.5
+        return WEAPON_AXE[self._idx(self.weapon)] > 0.5
 
     def fire_sec(self) -> np.ndarray:
-        return WEAPON_FIRE[self.weapon]
+        return WEAPON_FIRE[self._idx(self.weapon)]
 
     def armor_red(self) -> np.ndarray:
-        return ARMOR_RED[self.armor]
+        ai = np.where(self.force_armor >= 0, self.force_armor, self.armor)
+        return ARMOR_RED[ai]
 
     def ranged_spec(self):
         return (
@@ -148,6 +156,8 @@ class BotArrays:
         self.has_shield[mask] = False
         self.has_totem[mask] = False
         self.vel[mask] = 0.0
+        self.force_weapon[mask] = -1
+        self.force_armor[mask] = -1
 
 
 class ProArena:
@@ -166,9 +176,15 @@ class ProArena:
         self.obstacles = np.zeros((self.n, MAX_OBSTACLES, 2), np.float32)
         self.obstacle_ttl = np.zeros((self.n, MAX_OBSTACLES), np.float32)
         self.obstacle_n = np.zeros(self.n, np.int32)
+        self.human = np.zeros(self.n, bool)     # env controlled by a human (no enemy brain)
+        self.ai_drives_learner = np.zeros(self.n, bool)  # when True, learner is the AI
         self.consumed = np.zeros((self.n, len(TECHNIQUES)), np.int32)
         self.last_tech = np.zeros(self.n, np.int32)
         self.events = [dict() for _ in range(self.n)]
+        self._ai_action: np.ndarray | None = None
+        self._human_action: np.ndarray | None = None
+        self.human_tech = np.zeros(self.n, np.int32)
+        self.pve = False
         self.reset(np.ones(self.n, bool))
 
     # ------------------------------------------------------------------ loadouts
@@ -264,6 +280,7 @@ class ProArena:
         self.L.reset_mask(mask)
         self.E.reset_mask(mask)
         self.step_count[mask] = 0
+        self._human_action = None
         self.t[mask] = 0.0
         self.obstacle_ttl[mask] = 0.0
         self.obstacle_n[mask] = 0
@@ -293,6 +310,14 @@ class ProArena:
         self._roll(self.E, sub, self.L.weapon.copy(), self.L.armor.copy(),
                    self.L.ranged_type.copy(), pro=True)
         return self._obs()
+
+    def set_ai_action(self, action) -> None:
+        """Queue the action the AI opponent should execute on the next step."""
+        self._ai_action = np.asarray(action, np.int32)
+
+    def set_human_action(self, action) -> None:
+        """Queue the action the human player executes on the next step (PvE mode)."""
+        self._human_action = None if action is None else np.asarray(action, np.int32)
 
     def set_difficulty(self, value: float) -> None:
         self.difficulty[:] = float(value)
@@ -639,6 +664,294 @@ class ProArena:
         }
 
     # ---------------------------------------------------------------- main step
+    # ------------------------------------------------------------- human brain
+    def _human_brain(self, dmg_dealt, dmg_taken, healed) -> dict:
+        """Human-controlled player acts on the enemy seat (E); AI plays the learner seat.
+
+        Returns the same dict shape as `_enemy_brain` and leaves E's move to apply.
+        """
+        L, E = self.L, self.E
+        r = self.rng
+        n = self.n
+        act = np.asarray(self._human_action, np.int32).reshape(-1)
+        if act.size != n:
+            act = np.resize(act, n)
+
+        vec = L.pos - E.pos
+        dist = np.linalg.norm(vec, axis=1)
+        fwd = vec / np.maximum(dist, 1e-6)[:, None]
+        right = np.stack([-fwd[:, 1], fwd[:, 0]], 1)
+        move = np.zeros((n, 2), np.float32)
+        speed_mult = self._speed_mult(E)
+        speed = np.full(n, WALK, np.float32) * speed_mult
+        want_jump = np.zeros(n, bool)
+        want_attack = np.zeros(n, bool)
+        sprinting = np.zeros(n, bool)
+        tech = np.zeros(n, np.int32)
+        waste = np.zeros(n, bool)
+
+        def a(*ids):
+            m = np.zeros(n, bool)
+            for i in ids:
+                m |= act == i
+            return m
+
+        # ---- movement
+        m = a(1); move = np.where(m[:, None], fwd, move)
+        m = a(2); move = np.where(m[:, None], -fwd, move)
+        m = a(3); move = np.where(m[:, None], -right, move)
+        m = a(4); move = np.where(m[:, None], right, move)
+        m = a(5); move = np.where(m[:, None], fwd, move); want_attack |= m
+        m = a(6); move = np.where(m[:, None], -right, move); want_attack |= m
+        m = a(7); move = np.where(m[:, None], right, move); want_attack |= m
+        want_jump |= a(8)
+        m = a(9)
+        move = np.where(m[:, None], fwd, move); want_jump |= m; sprinting |= m
+        speed = np.where(m, SPRINT * speed_mult, speed); want_attack |= m
+        m = a(10)
+        move = np.where(m[:, None], fwd, move); sprinting |= m
+        speed = np.where(m, SPRINT * speed_mult, speed)
+        m = a(11); move = np.where(m[:, None], -fwd, move); want_attack |= m
+
+        # ---- shield
+        m = a(12)
+        ok = m & E.has_shield & (E.shield_disabled <= 0.0)
+        E.shield_up = np.where(ok, True, E.shield_up)
+        move = np.where(ok[:, None], -fwd * 0.45, move)
+        waste |= m & ~ok
+
+        # ---- golden apple
+        m = a(13) & (E.gaps > 0) & (E.use_lock <= 0.0)
+        if m.any():
+            E.gaps = np.where(m, E.gaps - 1, E.gaps)
+            E.regen = np.where(m, 5.0, E.regen)
+            before = E.hp + E.abs
+            E.abs = np.where(m, np.maximum(E.abs, 4.0), E.abs)
+            healed += np.maximum(0.0, (E.hp + E.abs) - before)
+            E.use_lock = np.where(m, 0.35, E.use_lock)
+            tech = np.where(m, T_GAP, tech)
+        waste |= a(13) & ~m
+
+        # ---- instant heal
+        m = a(14) & (E.splashes > 0) & (E.use_lock <= 0.0)
+        if m.any():
+            E.splashes = np.where(m, E.splashes - 1, E.splashes)
+            before = E.hp
+            E.hp = np.where(m, np.minimum(20.0, E.hp + 7.5), E.hp)
+            healed += np.maximum(0.0, E.hp - before)
+            E.use_lock = np.where(m, 0.2, E.use_lock)
+            tech = np.where(m, T_HEAL, tech)
+        waste |= a(14) & ~m
+
+        # ---- ender pearl
+        m = a(15) & (E.pearls > 0) & (E.pearl_cd <= 0.0)
+        if m.any():
+            E.pearls = np.where(m, E.pearls - 1, E.pearls)
+            E.pearl_cd = np.where(m, 1.5, E.pearl_cd)
+            E.web = np.where(m, 0.0, E.web)
+            E.lava = np.where(m, 0.0, E.lava)
+            tgt = np.where((dist > 3.8)[:, None], L.pos - fwd * 2.1, E.pos - fwd * 4.0)
+            E.pos = np.where(m[:, None], np.clip(tgt, -ARENA_BOUND, ARENA_BOUND), E.pos)
+            pearl_dmg, _ = self._damage(E, np.where(m, 1.5, 0.0), bypass=True)
+            dmg_taken += pearl_dmg
+            tech = np.where(m, T_PEARL, tech)
+        waste |= a(15) & ~m
+
+        # ---- buff potion
+        m = a(16) & (E.buffs > 0) & (E.buff <= 1.0) & (E.use_lock <= 0.0)
+        if m.any():
+            E.buffs = np.where(m, E.buffs - 1, E.buffs)
+            E.buff = np.where(m, 15.0, E.buff)
+            E.use_lock = np.where(m, 0.25, E.use_lock)
+            tech = np.where(m, T_BUFF, tech)
+        waste |= a(16) & ~m
+
+        # ---- ranged
+        m = a(17) & (E.ranged > 0) & (E.use_lock <= 0.0)
+        if m.any():
+            rdm, rkb, rsl, rpierce = E.ranged_spec()
+            in_range = (dist >= 1.6) & (dist <= 16.0)
+            cover = self._obstacle_between(E.pos, L.pos)
+            blocked = L.has_shield & L.shield_up & (L.shield_disabled <= 0) & (~rpierce)
+            hit = m & in_range & (~cover) & (~blocked)
+            dtg, pop = self._damage(L, np.where(hit, rdm, 0.0), bypass=rpierce)
+            dmg_dealt += dtg
+            L.slow = np.where(hit, np.maximum(L.slow, rsl), L.slow)
+            L.vel += fwd * np.where(hit, rkb, 0.0)[:, None]
+            E.ranged = np.where(m, E.ranged - 1, E.ranged)
+            E.use_lock = np.where(m, 0.15, E.use_lock)
+            tech = np.where(m, T_RANGED, tech)
+        waste |= a(17) & ~m
+
+        # ---- barricade
+        m = (a(18) & (E.blocks >= 2) & (E.use_lock <= 0.0) & (dist >= 1.6) & (dist <= 7.5)
+             & (self.obstacle_n < MAX_OBSTACLES))
+        if m.any():
+            E.blocks = np.where(m, E.blocks - 2, E.blocks)
+            self._add_obstacle(np.clip((E.pos + L.pos) * 0.5, -8.0, 8.0), 12.0)
+            E.use_lock = np.where(m, 0.25, E.use_lock)
+            tech = np.where(m, T_BARRICADE, tech)
+        waste |= a(18) & ~m
+
+        # ---- cobweb / lava trap
+        m_web = (a(19) & (E.cobwebs > 0) & (E.use_lock <= 0.0) & (dist <= 4.5)
+                 & (E.lava_bk <= 0))
+        m_lava = (a(19) & ~m_web & (E.lava_bk > 0) & (E.use_lock <= 0.0)
+                  & (dist >= 1.9) & (dist <= 4.2))
+        if m_web.any():
+            E.cobwebs = np.where(m_web, E.cobwebs - 1, E.cobwebs)
+            L.web = np.where(m_web, 2.6, L.web)
+            E.use_lock = np.where(m_web, 0.25, E.use_lock)
+            tech = np.where(m_web, T_COBWEB, tech)
+        if m_lava.any():
+            E.lava_bk = np.where(m_lava, E.lava_bk - 1, E.lava_bk)
+            L.lava = np.where(m_lava, 1.6, L.lava)
+            L.fire = np.where(m_lava, np.maximum(L.fire, 3.5), L.fire)
+            E.use_lock = np.where(m_lava, 0.3, E.use_lock)
+            tech = np.where(m_lava, T_LAVA, tech)
+        waste |= a(19) & ~(m_web | m_lava)
+
+        # ---- water bucket
+        m = a(20) & (E.water_bk > 0) & (E.use_lock <= 0.0)
+        hazard = (E.fire > 0) | (E.lava > 0) | (E.web > 0)
+        use = m & (hazard | (dist <= 3.4))
+        if use.any():
+            E.water_bk = np.where(use, E.water_bk - 1, E.water_bk)
+            E.fire = np.where(use, 0.0, E.fire)
+            E.lava = np.where(use, 0.0, E.lava)
+            E.web = np.where(use, 0.0, E.web)
+            push = use & (dist <= 3.4)
+            L.vel += fwd * np.where(push, 4.5, 0.0)[:, None]
+            E.use_lock = np.where(use, 0.25, E.use_lock)
+            tech = np.where(use, T_WATER, tech)
+        waste |= a(20) & ~use
+
+        # ---- pillar jump
+        m = a(21) & (E.blocks > 0) & (E.use_lock <= 0.0) & (E.y <= 1e-4) & (E.pillar <= 0.0)
+        if m.any():
+            E.blocks = np.where(m, E.blocks - 1, E.blocks)
+            E.pillar = np.where(m, 1.8, E.pillar)
+            E.use_lock = np.where(m, 0.2, E.use_lock)
+            want_jump |= m
+            tech = np.where(m, T_PILLAR, tech)
+        waste |= a(21) & ~m
+
+        # ---- end crystal
+        m = (a(22) & (E.crystals > 0) & (E.obsidian > 0) & (E.use_lock <= 0.0)
+             & (dist >= 2.4) & (dist <= 5.5))
+        if m.any():
+            E.crystals = np.where(m, E.crystals - 1, E.crystals)
+            E.obsidian = np.where(m, E.obsidian - 1, E.obsidian)
+            E.use_lock = np.where(m, 0.3, E.use_lock)
+            dtg, dsf, *_ = self._explode(L, E, 12.0, 3.0, 24.0, 7.0)
+            dmg_dealt += dtg
+            dmg_taken += dsf
+            tech = np.where(m, T_CRYSTAL, tech)
+        waste |= a(22) & ~m
+
+        # ---- respawn anchor
+        m = (a(23) & (E.anchors > 0) & (E.use_lock <= 0.0) & (dist >= 1.5) & (dist <= 4.8))
+        if m.any():
+            E.anchors = np.where(m, E.anchors - 1, E.anchors)
+            E.use_lock = np.where(m, 0.3, E.use_lock)
+            dtg, dsf, *_ = self._explode(L, E, 10.0, 2.5, 20.0, 6.0)
+            dmg_dealt += dtg
+            dmg_taken += dsf
+            tech = np.where(m, T_ANCHOR, tech)
+        waste |= a(23) & ~m
+
+        # ---- TNT minecart
+        m = (a(24) & (E.minecarts > 0) & (E.use_lock <= 0.0) & (dist >= 3.0) & (dist <= 8.5))
+        if m.any():
+            E.minecarts = np.where(m, E.minecarts - 1, E.minecarts)
+            E.use_lock = np.where(m, 0.35, E.use_lock)
+            dtg, dsf, *_ = self._explode(L, E, 8.5, 2.0, 17.0, 5.0)
+            dmg_dealt += dtg
+            dmg_taken += dsf
+            tech = np.where(m, T_MINECART, tech)
+        waste |= a(24) & ~m
+
+        # ---- obsidian cage
+        m = a(25) & (E.obsidian >= 4) & (E.use_lock <= 0.0)
+        if m.any():
+            E.obsidian = np.where(m, E.obsidian - 4, E.obsidian)
+            E.cage_until = np.where(m, 4.0, E.cage_until)
+            E.use_lock = np.where(m, 0.3, E.use_lock)
+            tech = np.where(m, T_CAGE, tech)
+        waste |= a(25) & ~m
+
+        # ---- W-tap (attack + reduced cooldown / no knockback, handled by caller)
+        m = a(26) & (dist <= REACH + 0.2) & (E.cd <= 0.03)
+        want_attack |= m
+        if m.any():
+            E.cd = np.where(m, E.cd_time() * 0.7, E.cd)
+            tech = np.where(m, T_WTAP, tech)
+        waste |= a(26) & ~m
+
+        # ---- pearl + crystal
+        m = (a(27) & (E.pearls > 0) & (E.crystals > 0) & (E.obsidian > 0)
+             & (E.pearl_cd <= 0.0) & (E.use_lock <= 0.0) & (dist >= 3.6) & (dist <= 12.0))
+        if m.any():
+            E.pearls = np.where(m, E.pearls - 1, E.pearls)
+            E.crystals = np.where(m, E.crystals - 1, E.crystals)
+            E.obsidian = np.where(m, E.obsidian - 1, E.obsidian)
+            E.pearl_cd = np.where(m, 1.5, E.pearl_cd)
+            E.pos = np.where(m[:, None], np.clip(L.pos - fwd * 1.9, -ARENA_BOUND, ARENA_BOUND), E.pos)
+            dtg, dsf, *_ = self._explode(L, E, 12.0, 3.0, 24.0, 7.0)
+            dmg_dealt += dtg
+            dmg_taken += dsf
+            tech = np.where(m, T_PEARL_CRYSTAL, tech)
+        waste |= a(27) & ~m
+
+        # ---- vertical physics for the human
+        jump_ok = want_jump & (E.y <= 1e-4) & (E.web <= 0)
+        E.vy = np.where(jump_ok, 8.4, E.vy)
+        E.y = E.y + E.vy * DT
+        E.vy = np.where(E.y > 0, E.vy - 28.0 * DT, 0.0)
+        E.y = np.maximum(E.y, 0.0)
+
+        # ---- melee (human -> AI)
+        re_dist = np.linalg.norm(L.pos - E.pos, axis=1)
+        hit_dir = (L.pos - E.pos) / np.maximum(re_dist, 1e-6)[:, None]
+        cover = self._obstacle_between(E.pos, L.pos)
+        eff_reach = REACH + np.where(E.pillar > 0, 0.30, 0.0)
+        swing = (want_attack & (E.use_lock <= 0.0) & (E.cd <= 0.04) & (re_dist <= eff_reach)
+                 & ((~cover) | (E.pillar > 0)))
+        l_shield = L.has_shield & L.shield_up & (L.shield_disabled <= 0)
+        break_shield = swing & l_shield & self._axe_of(E)
+        blocked = swing & l_shield & (~self._axe_of(E))
+        real = swing & (~l_shield | break_shield)
+        crit = ((E.y > 0.05) & (E.vy < 0.0) & (~sprinting)) | ((E.pillar > 0) & (~sprinting))
+        wtap = a(26) & real
+        mult = np.where(crit, 1.5, 1.0)
+        mult = np.where(wtap, mult * 1.15, mult)
+        bonus = np.where(E.buff > 0, 3.0, 0.0)
+        raw = np.where(real, (E.dmg() + bonus) * mult, 0.0)
+        dealt, pop = self._damage(L, raw)
+        dmg_dealt += dealt
+        L.fire = np.where((dealt > 0) & (E.fire_sec() > 0), np.maximum(L.fire, E.fire_sec()), L.fire)
+        kb = np.where(real & (dealt > 0), 4.4 * E.kb_mult() * np.where(sprinting, 1.35, 1.0), 0.0)
+        kb = np.where(wtap, 0.0, kb)
+        L.vel += hit_dir * kb[:, None]
+        if break_shield.any():
+            L.shield_up = np.where(break_shield, False, L.shield_up)
+            L.shield_disabled = np.where(break_shield, 5.0, L.shield_disabled)
+        E.vel -= hit_dir * np.where(blocked, 2.0, 0.0)[:, None]
+        E.cd = np.where(swing, np.maximum(E.cd, E.cd_time()), E.cd)
+
+        # ---- apply human movement (mirrors _enemy_brain's tail)
+        E.vel = E.vel * 0.45 + move * speed[:, None] * 0.55
+        E.pos = self._push_out(np.clip(E.pos + E.vel * DT, -ARENA_BOUND, ARENA_BOUND))
+
+        return {
+            "move": move, "dist": np.linalg.norm(L.pos - E.pos, axis=1), "fwd": fwd,
+            "acted": np.zeros(n, bool), "dmg_dealt": dmg_dealt,
+            "dmg_taken": dmg_taken, "healed": healed, "tech": tech, "waste": waste,
+        }
+
+    def _axe_of(self, B) -> np.ndarray:
+        return WEAPON_AXE[B._idx(B.weapon)] > 0.5
+
     def step(self, actions: np.ndarray):
         act = np.asarray(actions, np.int32)
         n = self.n
@@ -965,7 +1278,11 @@ class ProArena:
         L.pos = self._push_out(np.clip(L.pos + L.vel * DT, -ARENA_BOUND, ARENA_BOUND))
 
         # ---- enemy decides & moves
-        brain = self._enemy_brain(act, dmg_dealt, dmg_taken, healed, None)
+        if self.pve and self._human_action is not None:
+            brain = self._human_brain(dmg_dealt, dmg_taken, healed)
+            self.human_tech = brain["tech"]
+        else:
+            brain = self._enemy_brain(act, dmg_dealt, dmg_taken, healed, None)
         dmg_dealt, dmg_taken, healed = brain["dmg_dealt"], brain["dmg_taken"], brain["healed"]
 
         # ---- obstacles & timers
@@ -1081,7 +1398,10 @@ class ProArena:
             "learner_dead": learner_dead, "enemy_dead": enemy_dead, "timeout": truncated,
             "learner_hp": L.hp.copy(), "enemy_hp": E.hp.copy(), "distance": re_dist.copy(),
             "damage_dealt": dmg_dealt, "damage_taken": dmg_taken, "healed": healed,
-            "tech": tech, "waste": waste, **{k: v for k, v in flags.items()},
+            "tech": tech, "waste": waste,
+            "human_tech": (self.human_tech.copy() if self._human_action is not None
+                           and self.pve else np.zeros(n, np.int32)),
+            **{k: v for k, v in flags.items()},
         }
         obs = self._obs()
         return obs, reward, terminated, truncated, done, info
@@ -1185,6 +1505,14 @@ class ProPvPVecEnv(VecEnv):
         self.draws = 0
         self.tech_counts = {name: 0 for name in TECHNIQUES if name != "none"}
         self.last_results: list[str] = []
+
+    def set_ai_action(self, action) -> None:
+        """Queue the action the AI opponent should execute on the next step."""
+        self._ai_action = np.asarray(action, np.int32)
+
+    def set_human_action(self, action) -> None:
+        """Queue the action the human player executes on the next step (PvE mode)."""
+        self._human_action = None if action is None else np.asarray(action, np.int32)
 
     def set_difficulty(self, value: float) -> None:
         self.core.set_difficulty(value)

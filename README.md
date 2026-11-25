@@ -76,6 +76,27 @@ STEP_DELAY_MS=75 node bot/bot.js            # LearnerBot + профессион�
   `tnt_minecart 1`, `respawn_anchor 1`, `wtap_combo 1`, `pillar_jump 5`, `lava_trap 3`,
   `crossbow 4`, `buff_potion 4`.
 
+## Поиграть самому (браузер)
+
+Сырой порт Minecraft `25565` из песочницы наружу не пробрасывается, поэтому для игры
+с человеком есть отдельная браузерная арена — тот же движок боя, что и в обучении:
+
+```bash
+.venv/bin/python human_server.py --port 8090 --model models/pvp_ppo_pro_500k.zip --level normal
+```
+
+Открыть `http://localhost:8090` — вид сверху, кнопки действий и управление с клавиатуры
+(`WASD`, пробел, ЛКМ/E, Shift, 1–9). Ты играешь за второго бойца, нейросеть — за первого.
+
+| Уровень | Что делает гандикап |
+|---|---|
+| Лёгкий  | у ИИ 6 HP вместо 20, и он действует через ход |
+| Обычный | у ИИ 17 HP вместо 20 |
+| Про     | без гандикапа — так, как она играла 500 000 боёв |
+
+API: `GET /api/state`, `POST /api/action {"action": N}`, `POST /api/level {"level": "easy|normal|pro"}`,
+`POST /api/reset`. Все 28 действий описаны в `web/play.html` (массив `PAD`).
+
 ## Структура
 
 ```
@@ -88,5 +109,7 @@ train_pro.py            обучение PRO-модели (500k боёв)
 train.py                обучение в live/sim режиме
 play.py                 запуск на живом сервере
 play_pro.py             оценка PRO-модели в симуляторе (--skill 0..1)
+human_server.py         браузерная арена «ты против ИИ» (HTTP, порт 8090)
+web/play.html           интерфейс арены: вид сверху, кнопки, лог боя
 record_360_video.py     рендер 8-камерного 360° видео
 ```
