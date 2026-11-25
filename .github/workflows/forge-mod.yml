@@ -27,8 +27,29 @@ jobs:
           gradle-version: '7.6.4'
 
       - name: Build
+        id: buildstep
         working-directory: forge-mod
-        run: gradle build --no-daemon --stacktrace -x test
+        continue-on-error: true
+        run: gradle build --no-daemon --stacktrace -x test 2>&1 | tee build.log
+
+      - name: Publish log to issue on failure
+        if: steps.buildstep.outcome == 'failure'
+        working-directory: forge-mod
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          log = open('build.log', errors='replace').read()
+          tail = log[-40000:]
+          body = "Automatic build failure log for `" + os.environ.get("GITHUB_SHA","")[:12] + "`\n\n```\n" + tail + "\n```"
+          open('/tmp/body.json','w').write(json.dumps({"title":"[CI] forge-mod build failure "+os.environ.get("GITHUB_RUN_ID",""),"body":body}))
+          subprocess.run(["gh","api","repos/"+os.environ["GITHUB_REPOSITORY"]+"/issues","--input","/tmp/body.json"],check=False)
+          PY
+
+      - name: Fail job if build failed
+        if: steps.buildstep.outcome == 'failure'
+        run: exit 1
 
       - name: Show output
         working-directory: forge-mod

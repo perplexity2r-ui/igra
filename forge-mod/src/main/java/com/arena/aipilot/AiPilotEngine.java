@@ -68,6 +68,13 @@ public final class AiPilotEngine {
     private static double lastDist = 99.0;
     private static int attackingCooldown = 0;
 
+    // Интенты движения, которые выставляет «мозг» и применяет InputUpdateEvent.
+    private static float inForward = 0.0F;
+    private static float inStrafe = 0.0F;
+    private static boolean inJump = false;
+    private static boolean inBack = false;
+    private static boolean inSprint = false;
+
     private AiPilotEngine() {}
 
     public static void reset() {
@@ -79,6 +86,11 @@ public final class AiPilotEngine {
         stuckTicks = 0;
         lastDist = 99.0;
         attackingCooldown = 0;
+        inForward = 0.0F;
+        inStrafe = 0.0F;
+        inJump = false;
+        inBack = false;
+        inSprint = false;
     }
 
     public static void cycleStyle() {
@@ -185,7 +197,7 @@ public final class AiPilotEngine {
         List<LivingEntity> list = mc.level.getEntitiesOfClass(LivingEntity.class, box,
                 e -> e != p && e.isAlive() && e.isPickable() && !(e instanceof ArmorStand)
                         && !(e instanceof Player && (((Player) e).isCreative()
-                             || ((Player) e).isSpectator() || ((Player) e).isSpectator())));
+                             || ((Player) e).isSpectator())));
         LivingEntity best = null;
         double bestScore = Double.MAX_VALUE;
         Vec3 eye = p.position();
@@ -220,20 +232,15 @@ public final class AiPilotEngine {
 
     // -------------------------------------------------------------- movement
     private static void chase(LocalPlayer p, LivingEntity t, double dist) {
-        MovementInput in = p.input;
-        if (in == null) return;
-        // идём вперёд, если цель впереди; иначе разворот делает aimAt
-        in.forwardImpulse = 1.0F;
-        in.leftImpulse = 0.0F;
-        in.up = true;
-        in.down = false;
-        in.left = false;
-        in.right = false;
-        in.jumping = shouldJump(p, t, dist);
-        p.setSprinting(dist > 3.6);
-        if (stuckTicks > 12) in.jumping = true;
+        inForward = 1.0F;
+        inStrafe = 0.0F;
+        inBack = false;
+        inJump = shouldJump(p, t, dist);
+        inSprint = dist > 3.6;
+        if (stuckTicks > 12) inJump = true;
         if (Math.abs(dist - lastDist) < 0.02 && dist > 3.2) stuckTicks++; else stuckTicks = 0;
         lastDist = dist;
+        p.setSprinting(inSprint);
     }
 
     private static boolean shouldJump(LocalPlayer p, LivingEntity t, double dist) {
@@ -244,15 +251,12 @@ public final class AiPilotEngine {
 
     private static void backOff(Minecraft mc) {
         LocalPlayer p = mc.player;
-        MovementInput in = p.input;
-        if (in == null) return;
-        in.forwardImpulse = -1.0F;
-        in.leftImpulse = (p.tickCount % 10 < 5) ? 0.8F : -0.8F;
-        in.up = false;
-        in.down = true;
-        in.jumping = p.onGround() && p.tickCount % 8 == 0;
+        inForward = -1.0F;
+        inStrafe = (p.tickCount % 10 < 5) ? 0.8F : -0.8F;
+        inBack = true;
+        inJump = p.onGround() && p.tickCount % 8 == 0;
+        inSprint = false;
         p.setSprinting(false);
-        // щит, если есть в руках
         raiseShield(mc, p);
     }
 
@@ -284,14 +288,11 @@ public final class AiPilotEngine {
         }
         attackingCooldown = Math.max(0, attackingCooldown - 1);
 
-        MovementInput in = p.input;
-        if (in != null) {
-            in.forwardImpulse = dist > 1.4 ? 0.55F : 0.0F;
-            in.leftImpulse = (p.tickCount % 20 < 10) ? 0.35F : -0.35F;
-            in.up = dist > 1.4;
-            in.down = false;
-            in.jumping = shouldJump(p, t, dist);
-        }
+        inForward = dist > 1.4 ? 0.55F : 0.0F;
+        inStrafe = (p.tickCount % 20 < 10) ? 0.35F : -0.35F;
+        inBack = false;
+        inJump = shouldJump(p, t, dist);
+        inSprint = false;
     }
 
     // ----------------------------------------------------------------- eat
@@ -309,13 +310,11 @@ public final class AiPilotEngine {
         if (s.isEmpty() || !s.getItem().isEdible()) { eatSlot = -1; return; }
         select(p, slot);
         if (!p.isUsingItem()) mc.gameMode.useItem(p, InteractionHand.MAIN_HAND);
-        MovementInput in = p.input;
-        if (in != null) {
-            in.forwardImpulse = -0.6F;
-            in.leftImpulse = 0.0F;
-            in.up = false; in.down = true;
-            in.jumping = false;
-        }
+        inForward = -0.6F;
+        inStrafe = 0.0F;
+        inBack = true;
+        inJump = false;
+        inSprint = false;
         p.setSprinting(false);
     }
 
@@ -350,28 +349,32 @@ public final class AiPilotEngine {
 
     private static void releaseKeys(Minecraft mc) {
         LocalPlayer p = mc.player;
-        if (p == null || p.input == null) return;
-        MovementInput in = p.input;
-        in.forwardImpulse = 0.0F;
-        in.leftImpulse = 0.0F;
-        in.up = false; in.down = false; in.left = false; in.right = false;
-        in.jumping = false;
-        p.setSprinting(false);
+        inForward = 0.0F;
+        inStrafe = 0.0F;
+        inJump = false;
+        inBack = false;
+        inSprint = false;
+        if (p != null) p.setSprinting(false);
         eatSlot = -1;
     }
 
-    /** Перехват клавиатуры, пока автобой включён (иначе игрок «сбивает» движение). */
+    /**
+     * Перехват управления: пока автобой включён, ванильные клавиши игнорируются,
+     * а в игру уходят только интенты «мозга». Клиент штатно отправит их на сервер.
+     */
     public static void overrideInputs(MovementInput in) {
-        if (!(AiPilot.isEnabled()) || in == null) return;
+        if (!AiPilot.isEnabled() || in == null) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
-        if (target == null) return;
-        // импульсы полностью под нашим контролем
-        in.leftImpulse = clamp(in.leftImpulse);
-        in.forwardImpulse = clamp(in.forwardImpulse);
+        in.forwardImpulse = inForward;
+        in.leftImpulse = inStrafe;
+        in.up = inForward > 0.05F || inJump;
+        in.down = inForward < -0.05F;
+        in.left = inStrafe > 0.05F;
+        in.right = inStrafe < -0.05F;
+        in.jumping = inJump;
+        mc.player.setSprinting(inSprint);
     }
-
-    private static float clamp(float v) { return Math.max(-1.0F, Math.min(1.0F, v)); }
 
     // ------------------------------------------------------------------ HUD
     public static void renderHud(RenderGameOverlayEvent.Text event) {

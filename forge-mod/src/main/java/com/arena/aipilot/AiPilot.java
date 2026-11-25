@@ -31,6 +31,8 @@ import org.lwjgl.glfw.GLFW;
  *            используйте клиентскую команду "/aip ...")
  */
 @Mod(AiPilot.MOD_ID)
+@Mod.EventBusSubscriber(modid = AiPilot.MOD_ID, value = net.minecraftforge.api.distmarker.Dist.CLIENT,
+        bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class AiPilot {
 
     public static final String MOD_ID = "aipilot";
@@ -68,8 +70,8 @@ public class AiPilot {
 
     // ---------------------------------------------------------------- hotkeys
     @SubscribeEvent
-    public void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.START) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) { lastO = lastJ = lastK = false; return; }
 
@@ -84,26 +86,26 @@ public class AiPilot {
         }
         lastO = o; lastJ = j; lastK = k;
 
-        if (enabled) {
+        if (enabled && !mc.isPaused()) {
             AiPilotEngine.tick(mc);
         }
     }
 
     /** Жёстко перехватываем клавиатурные инпуты, пока автобой включён. */
     @SubscribeEvent
-    public void onInput(InputUpdateEvent event) {
+    public static void onInput(InputUpdateEvent event) {
         if (!enabled) return;
         AiPilotEngine.overrideInputs(event.getMovementInput());
     }
 
     @SubscribeEvent
-    public void onLogout(ClientPlayerNetworkEvent.LoggedOutEvent event) {
+    public static void onLogout(ClientPlayerNetworkEvent.LoggedOutEvent event) {
         enabled = false;
         AiPilotEngine.reset();
     }
 
     @SubscribeEvent
-    public void onOverlay(RenderGameOverlayEvent.Text event) {
+    public static void onOverlay(RenderGameOverlayEvent.Text event) {
         if (!hudVisible) return;
         AiPilotEngine.renderHud(event);
     }
