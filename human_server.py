@@ -85,6 +85,9 @@ class ArenaSession:
                 "in_lava": bool(B.lava[0] > 0), "slowed": bool(B.slow[0] > 0),
                 "buff": bool(B.buff[0] > 0), "caged": bool(B.cage_until[0] > 0),
                 "cooldown": round(float(B.cd[0]), 2),
+                "combo_taken": int(B.combo_taken[0]),
+                "stunned": bool(B.stun[0] > 0),
+                "can_counter": bool(B.counter_until[0] > 0),
             }
             d.update(self._kit(B))
             return d
@@ -154,7 +157,17 @@ class ArenaSession:
 
             human_tech = int(info["human_tech"][0])
             ai_tech = int(info["tech"][0])
-            if human_tech:
+            if bool(info["human_combo_broken"][0]) or bool(info["combo_broken"][0]):
+                self.last_event = "🛡 Ты вышел из комбо — окно для контратаки!"
+            elif bool(info["human_combo_countered"][0]) or bool(info["combo_countered"][0]):
+                self.last_event = "⚔ Контр-комбо! Ты наказал противника."
+            elif bool(info["combo_hit"][0]):
+                self.last_event = f"🔥 Ты в комбо: {int(info['combo_landed'][0])} удар(а) подряд"
+            elif int(info["combo_landed"][0]) > 0:
+                # combo_landed == the chain sitting on the HUMAN seat (E); combo_taken is the AI's
+                self.last_event = (f"⚠ Тебя в комбо ({int(info['combo_landed'][0])}): "
+                                   f"жми R — выйти из комбо")
+            elif human_tech:
                 self.last_event = f"Ты применил: {TECHNIQUES[human_tech]}"
             elif ai_tech:
                 self.last_event = f"ИИ применил: {TECHNIQUES[ai_tech]}"

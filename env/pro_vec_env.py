@@ -23,8 +23,8 @@ from stable_baselines3.common.vec_env import VecEnv
 
 from .sim_env import ARMOR_TIERS, BLOCK_TYPES, MELEE_POOL, RANGED_TYPES
 
-N_ACTIONS = 28
-OBS_DIM = 30
+N_ACTIONS = 30
+OBS_DIM = 34
 DT = 0.10
 WALK = 4.317
 SPRINT = 5.612
@@ -39,6 +39,7 @@ WEAPON_CD = np.array([w.cooldown for w in MELEE_POOL], dtype=np.float32)
 WEAPON_KB = np.array([w.kb_mult for w in MELEE_POOL], dtype=np.float32)
 WEAPON_AXE = np.array([1.0 if w.shield_break else 0.0 for w in MELEE_POOL], dtype=np.float32)
 WEAPON_FIRE = np.array([w.fire_seconds for w in MELEE_POOL], dtype=np.float32)
+AXE_INDEX = int(next((i for i, w in enumerate(MELEE_POOL) if w.shield_break), 0))
 ARMOR_RED = np.array([a.reduction for a in ARMOR_TIERS], dtype=np.float32)
 RANGED_DMG = np.array([r.damage for r in RANGED_TYPES], dtype=np.float32)
 RANGED_KB = np.array([r.knockback for r in RANGED_TYPES], dtype=np.float32)
@@ -50,11 +51,21 @@ TECHNIQUES = [
     "none", "golden_apple", "instant_heal", "ender_pearl", "buff_potion", "ranged",
     "block_barricade", "cobweb_trap", "lava_trap", "water_bucket", "pillar_jump",
     "end_crystal", "respawn_anchor", "tnt_minecart", "obsidian_cage", "wtap_combo",
-    "pearl_crystal", "shield_block",
+    "pearl_crystal", "shield_block", "combo_break", "combo_counter",
 ]
 T_GAP, T_HEAL, T_PEARL, T_BUFF, T_RANGED = 1, 2, 3, 4, 5
 T_BARRICADE, T_COBWEB, T_LAVA, T_WATER, T_PILLAR = 6, 7, 8, 9, 10
 T_CRYSTAL, T_ANCHOR, T_MINECART, T_CAGE, T_WTAP, T_PEARL_CRYSTAL = 11, 12, 13, 14, 15, 16
+T_COMBO_BREAK, T_COMBO_COUNTER = 18, 19
+A_COMBO_BREAK, A_COMBO_COUNTER = 28, 29
+
+# combo tuning: consecutive hits on a reeling target ramp up, and the reeling bot
+# is stunned so a clean chain can be "combo'd" — escaping resets the streak.
+COMBO_WINDOW = 1.6     # seconds a hit keeps the combo alive (spans swing cooldown)
+COMBO_STUN = 0.45      # seconds a combo'd bot cannot swing back
+COMBO_RAMP = 0.06      # +6% damage per combo hit (capped)
+COMBO_BREAK_LOCK = 0.18  # i-frames granted right after a successful escape
+COUNTER_WINDOW = 1.8   # seconds an escape leaves the attacker open to a counter
 
 
 class BotArrays:
@@ -105,6 +116,14 @@ class BotArrays:
         self.y = np.zeros(n, f)
         self.vy = np.zeros(n, f)
 
+        # combo state: consecutive hits landed on *this* bot + time locked in the combo
+        self.combo_taken = np.zeros(n, np.int32)
+        self.stun = np.zeros(n, f)
+        self.combo_window = np.zeros(n, f)   # time left to continue/escape the current combo
+        self.escape_cd = np.zeros(n, f)      # cooldown on combo_break
+        self.counter_until = np.zeros(n, f)  # window to punish right after escaping
+        self.counter_armed = np.zeros(n, f)  # buffered counter request (fires on cooldown)
+
         # manual overrides (set for a human-controlled player)
         self.force_weapon = np.full(n, -1, np.int32)
         self.force_armor = np.full(n, -1, np.int32)
@@ -144,6 +163,7 @@ class BotArrays:
         for arr in (
             self.cd, self.hurt_cd, self.regen, self.buff, self.fire, self.slow, self.web,
             self.lava, self.pillar, self.pearl_cd, self.use_lock, self.shield_disabled,
+            self.stun, self.combo_window, self.escape_cd, self.counter_until, self.counter_armed,
             self.y, self.vy, self.blocks, self.cobwebs, self.lava_bk, self.water_bk,
             self.gaps, self.splashes, self.pearls, self.buffs, self.ranged,
             self.crystals, self.anchors, self.minecarts, self.obsidian, self.cage_until,
@@ -158,6 +178,8 @@ class BotArrays:
         self.vel[mask] = 0.0
         self.force_weapon[mask] = -1
         self.force_armor[mask] = -1
+        self.combo_taken[mask] = 0
+        self.combo_window[mask] = 0.0
 
 
 class ProArena:
@@ -184,7 +206,11 @@ class ProArena:
         self._ai_action: np.ndarray | None = None
         self._human_action: np.ndarray | None = None
         self.human_tech = np.zeros(self.n, np.int32)
+        self._human_broke = np.zeros(self.n, bool)     # pve: human escaped an AI chain
+        self._human_countered = np.zeros(self.n, bool)  # pve: human landed a counter
         self.pve = False
+        self.e_aggression = 0.0   # 0 = normal pro, 1 = relentless combo pressure
+        self.combo_curriculum = 0.0  # share of fights that start mid-chain
         self.reset(np.ones(self.n, bool))
 
     # ------------------------------------------------------------------ loadouts
@@ -309,7 +335,29 @@ class ProArena:
         # Enemy is a professional: harder loadouts & mirrored asymmetry
         self._roll(self.E, sub, self.L.weapon.copy(), self.L.armor.copy(),
                    self.L.ranged_type.copy(), pro=True)
+
+        # combo curriculum — a share of fights starts with the learner already reeling,
+        # with the attacker parked inside reach so escaping must happen right away
+        if getattr(self, "combo_curriculum", 0.0) > 0.0:
+            hit = mask & (r.random(n) < self.combo_curriculum)
+            if bool(hit.any()):
+                self.L.combo_taken[hit] = 2
+                self.L.combo_window[hit] = COMBO_WINDOW
+                self.L.stun[hit] = COMBO_STUN
+                self.L.hurt_cd[hit] = 0.5
+                offset = self.E.pos[hit] - self.L.pos[hit]
+                norm = np.maximum(np.linalg.norm(offset, axis=1, keepdims=True), 1e-6)
+                self.E.pos[hit] = np.clip(self.L.pos[hit] + offset / norm * 2.1,
+                                          -ARENA_BOUND, ARENA_BOUND)
         return self._obs()
+
+    def set_combo_curriculum(self, share: float) -> None:
+        """Share (0..1) of new fights that start with the learner already in a chain."""
+        self.combo_curriculum = float(np.clip(share, 0.0, 0.9))
+
+    def set_aggression(self, value: float) -> None:
+        """0..1 — how relentlessly the scripted pro chases combo chains."""
+        self.e_aggression = float(np.clip(value, 0.0, 1.0))
 
     def set_ai_action(self, action) -> None:
         """Queue the action the AI opponent should execute on the next step."""
@@ -456,6 +504,11 @@ class ProArena:
             np.clip((E.crystals + E.anchors + E.minecarts) / 10.0, 0, 1),
             np.clip(L.obsidian / 16.0, 0, 1),
             (L.cage_until > 0.0).astype(np.float32),
+            # --- combo awareness (dims 30..33) ---
+            np.clip(L.combo_taken / 5.0, 0, 1),
+            np.clip(L.stun / 1.0, 0, 1),
+            np.clip(E.combo_taken / 5.0, 0, 1),
+            np.clip((L.hurt_cd / 0.5) * (L.combo_taken > 0), 0, 1),
         ], axis=1).astype(np.float32)
         return obs
 
@@ -607,9 +660,14 @@ class ProArena:
             acted |= m
 
         # ---- movement: pro keeps crystal distance, strafes, kites, jumps for crits
-        want_close = (dist > 3.05) & (~E.shield_up)
+        chase = 1.9 + 1.0 * self.e_aggression
+        want_close = (dist > chase) & (~E.shield_up)
         e_move += fwd * want_close[:, None]
-        back = (dist < 2.15) | ((E.hp <= 8.0) & (dist < 3.5))
+        # while a chain is live the pro presses in — that is what makes combos long
+        pressing = (L.combo_taken > 0) & (L.combo_window > 0.0) & (E.stun <= 0.0)
+        e_move += fwd * pressing[:, None] * 1.15
+        back = ((dist < 1.75) | ((E.hp <= 8.0) & (dist < 3.0) & (self.e_aggression < 0.35))) \
+            & (~pressing)
         e_move -= fwd * back[:, None] * 0.85
         strafe = np.where(r.random(self.n) < 0.5, 1.0, -1.0).astype(np.float32)
         right = np.stack([-fwd[:, 1], fwd[:, 0]], 1)
@@ -634,8 +692,11 @@ class ProArena:
 
         # ---- enemy melee swing
         re_dist = np.linalg.norm(E.pos - L.pos, axis=1)
-        want_hit = ((~E.shield_up) & (re_dist <= REACH) & (E.cd <= 0.0)
-                    & (r.random(self.n) < (0.55 + 0.4 * diff)) & (~acted))
+        hit_p = 0.55 + 0.30 * diff + 0.45 * self.e_aggression
+        reach = REACH + 0.45 * self.e_aggression
+        want_hit = ((~E.shield_up) & (re_dist <= reach) & (E.cd <= 0.0)
+                    & (r.random(self.n) < np.minimum(hit_p, 1.0))
+                    & (E.stun <= 0.0))
         if want_hit.any():
             blocked = L.has_shield & L.shield_up & (L.shield_disabled <= 0)
             axe_break = blocked & E.is_axe()
@@ -644,7 +705,11 @@ class ProArena:
             real_hit = want_hit & (~blocked | axe_break)
             crit = (E.y > 0.05) & (E.vy < 0.0)
             bonus = np.where(E.buff > 0, 3.0, 0.0)
-            raw = np.where(real_hit, (E.dmg() + bonus) * np.where(crit, 1.5, 1.0), 0.0)
+            combo_ramp = np.minimum(1.4, 1.0 + COMBO_RAMP * L.combo_taken)
+            punish = np.where(L.counter_until > 0.0, 1.6, 1.0)
+            raw = np.where(real_hit,
+                           (E.dmg() + bonus) * np.where(crit, 1.5, 1.0) * combo_ramp * punish,
+                           0.0)
             dtg, pop = self._damage(L, raw, blast=False)
             dmg_taken += np.where(want_hit & ~blocked, dtg, 0.0)
             L.fire = np.where((dtg > 0) & (E.fire_sec() > 0),
@@ -653,14 +718,37 @@ class ProArena:
             hit_dir = (L.pos - E.pos) / np.maximum(re_dist, 1e-6)[:, None]
             L.vel += hit_dir * kb[:, None]
             E.cd = np.where(want_hit, np.maximum(E.cd, E.cd_time()), E.cd)
+            # the scripted pro also chains: each landing hit reels the learner
+            e_hit = real_hit & (dtg > 0.0)
+            L.combo_taken = np.where(e_hit, L.combo_taken + 1, L.combo_taken)
+            L.combo_window = np.where(e_hit, COMBO_WINDOW, L.combo_window)
+            L.stun = np.where(e_hit, np.maximum(L.stun, COMBO_STUN), L.stun)
             if pop.any():
                 info["totem_popped_learner"] = (info.get("totem_popped_learner", False) | pop)
+
+        # NOTE: the pro does NOT escape learner chains while the combo curriculum is on
+        # (e_aggression > 0.5) — otherwise the student never gets to practise a long chain.
+        in_chain = (E.combo_taken >= 2) & (E.combo_window > 0.0) & (self.e_aggression < 0.5)
+        if in_chain.any():
+            can_escape = in_chain & E.has_shield & (E.shield_disabled <= 0.0) \
+                & (r.random(self.n) < 0.35 + 0.5 * diff)
+            E.shield_up = np.where(can_escape, True, E.shield_up)
+            e_move = np.where(can_escape[:, None], -fwd * 0.9, e_move)
+            E.stun = np.where(can_escape, 0.0, E.stun)
+            E.combo_taken = np.where(can_escape, 0, E.combo_taken)
+            E.combo_window = np.where(can_escape, 0.0, E.combo_window)
+            L.combo_taken = np.where(can_escape, 0, L.combo_taken)
+            E.counter_until = np.where(can_escape, COUNTER_WINDOW * 0.7, E.counter_until)
+            prev_broke = info.get("enemy_combo_broken")
+            info["enemy_combo_broken"] = (can_escape.copy() if prev_broke is None
+                                         else (prev_broke | can_escape))
 
         E.vel = E.vel * 0.45 + e_move * speed[:, None] * 0.55
         E.pos = self._push_out(np.clip(E.pos + E.vel * DT, -ARENA_BOUND, ARENA_BOUND))
         return {
             "move": e_move, "dist": dist, "fwd": fwd, "acted": acted,
             "dmg_dealt": dmg_dealt, "dmg_taken": dmg_taken, "healed": healed,
+            "got_comboed": info.get("got_comboed"),
         }
 
     # ---------------------------------------------------------------- main step
@@ -689,6 +777,9 @@ class ProArena:
         sprinting = np.zeros(n, bool)
         tech = np.zeros(n, np.int32)
         waste = np.zeros(n, bool)
+        counter_mult = np.ones(n, np.float32)
+        self._human_broke[:] = False
+        self._human_countered[:] = False
 
         def a(*ids):
             m = np.zeros(n, bool)
@@ -903,6 +994,51 @@ class ProArena:
             tech = np.where(m, T_PEARL_CRYSTAL, tech)
         waste |= a(27) & ~m
 
+        # ---- combo break (R): shield/water/pearl escape from the AI's chain
+        reeling_e = E.combo_taken > 0
+        escape_ready_e = reeling_e & (E.escape_cd <= 0.0) & (E.shield_disabled <= 0.0)
+        m = a(28) & escape_ready_e
+        if m.any():
+            shield_first = m & E.has_shield
+            water_next = m & (~shield_first) & (E.water_bk > 0)
+            pearl_next = m & (~shield_first) & (~water_next) & (E.pearls > 0)
+            E.shield_up = np.where(shield_first, True, E.shield_up)
+            E.water_bk = np.where(water_next, np.maximum(0.0, E.water_bk - 1), E.water_bk)
+            E.pearls = np.where(pearl_next, E.pearls - 1, E.pearls)
+            E.fire = np.where(water_next, 0.0, E.fire)
+            E.web = np.where(water_next, 0.0, E.web)
+            E.pos = np.where(pearl_next[:, None],
+                             np.clip(E.pos - fwd * 4.0, -ARENA_BOUND, ARENA_BOUND), E.pos)
+            E.combo_taken = np.where(m, 0, E.combo_taken)
+            E.combo_window = np.where(m, 0.0, E.combo_window)
+            E.stun = np.where(m, 0.0, E.stun)
+            E.hurt_cd = np.where(m, COMBO_BREAK_LOCK, E.hurt_cd)
+            E.escape_cd = np.where(m, 1.2, E.escape_cd)
+            E.pos = np.where(m[:, None],
+                             np.clip(E.pos - fwd * 1.2, -ARENA_BOUND, ARENA_BOUND), E.pos)
+            E.cd = np.where(m, np.minimum(E.cd, 0.02), E.cd)
+            E.counter_until = np.where(m, COUNTER_WINDOW, E.counter_until)
+            L.combo_taken = np.where(m, 0, L.combo_taken)
+            L.stun = np.where(m, np.maximum(L.stun, 0.6), L.stun)
+            E.vel -= fwd * np.where(m, 5.0, 0.0)[:, None]
+            tech = np.where(m, T_COMBO_BREAK, tech)
+            self._human_broke |= m
+        waste |= a(28) & ~m
+
+        # ---- combo counter (T): buffered punish on the same terms as the learner
+        punish_window_e = (E.counter_until > 0.0) | (L.stun > 0.0)
+        request_e = a(29) & (punish_window_e | (E.counter_armed > 0.0))
+        E.counter_armed = np.where(request_e, 1.2, E.counter_armed)
+        m = (E.counter_armed > 0.0) & (dist <= REACH + 0.75) & (E.cd <= 0.05)
+        if m.any():
+            E.counter_armed = np.where(m, 0.0, E.counter_armed)
+            E.vel += fwd * np.where(m, 3.0, 0.0)[:, None]
+            want_attack |= m
+            counter_mult = np.where(m, 1.6, 1.0)
+            tech = np.where(m, T_COMBO_COUNTER, tech)
+            self._human_countered |= m
+        waste |= a(29) & ~m
+
         # ---- vertical physics for the human
         jump_ok = want_jump & (E.y <= 1e-4) & (E.web <= 0)
         E.vy = np.where(jump_ok, 8.4, E.vy)
@@ -916,7 +1052,7 @@ class ProArena:
         cover = self._obstacle_between(E.pos, L.pos)
         eff_reach = REACH + np.where(E.pillar > 0, 0.30, 0.0)
         swing = (want_attack & (E.use_lock <= 0.0) & (E.cd <= 0.04) & (re_dist <= eff_reach)
-                 & ((~cover) | (E.pillar > 0)))
+                 & ((~cover) | (E.pillar > 0)) & (E.stun <= 0.0))
         l_shield = L.has_shield & L.shield_up & (L.shield_disabled <= 0)
         break_shield = swing & l_shield & self._axe_of(E)
         blocked = swing & l_shield & (~self._axe_of(E))
@@ -926,7 +1062,8 @@ class ProArena:
         mult = np.where(crit, 1.5, 1.0)
         mult = np.where(wtap, mult * 1.15, mult)
         bonus = np.where(E.buff > 0, 3.0, 0.0)
-        raw = np.where(real, (E.dmg() + bonus) * mult, 0.0)
+        e_chain = np.minimum(1.4, 1.0 + COMBO_RAMP * L.combo_taken)
+        raw = np.where(real, (E.dmg() + bonus) * mult * e_chain * counter_mult, 0.0)
         dealt, pop = self._damage(L, raw)
         dmg_dealt += dealt
         L.fire = np.where((dealt > 0) & (E.fire_sec() > 0), np.maximum(L.fire, E.fire_sec()), L.fire)
@@ -938,6 +1075,11 @@ class ProArena:
             L.shield_disabled = np.where(break_shield, 5.0, L.shield_disabled)
         E.vel -= hit_dir * np.where(blocked, 2.0, 0.0)[:, None]
         E.cd = np.where(swing, np.maximum(E.cd, E.cd_time()), E.cd)
+        # the human can chain too: landing hits reel the AI and stun it
+        e_hit = real & (dealt > 0.0)
+        L.combo_taken = np.where(e_hit, L.combo_taken + 1, L.combo_taken)
+        L.combo_window = np.where(e_hit, COMBO_WINDOW, L.combo_window)
+        L.stun = np.where(e_hit, np.maximum(L.stun, COMBO_STUN), L.stun)
 
         # ---- apply human movement (mirrors _enemy_brain's tail)
         E.vel = E.vel * 0.45 + move * speed[:, None] * 0.55
@@ -954,6 +1096,9 @@ class ProArena:
 
     def step(self, actions: np.ndarray):
         act = np.asarray(actions, np.int32)
+        self._got_comboed = np.zeros(self.n, bool)
+        if not hasattr(self, "_prev_chain"):
+            self._prev_chain = np.zeros(self.n, np.int32)
         n = self.n
         L, E = self.L, self.E
         self.step_count += 1
@@ -974,6 +1119,11 @@ class ProArena:
             "minecart_hit": np.zeros(n, bool),
             "cage_blocked": np.zeros(n, bool),
             "wtap_combo": np.zeros(n, bool),
+            "combo_hit": np.zeros(n, bool),
+            "combo_broken": np.zeros(n, bool),
+            "combo_countered": np.zeros(n, bool),
+            "enemy_combo_broken": np.zeros(n, bool),
+            "got_comboed": np.zeros(n, bool),
             "self_blast": np.zeros(n, bool),
             "totem_popped_learner": np.zeros(n, bool),
             "totem_popped_enemy": np.zeros(n, bool),
@@ -1265,6 +1415,60 @@ class ProArena:
             move = np.zeros((n, 2), np.float32)
         waste |= a(27) & ~m
 
+        # --- 28 combo break: escape a combo chain (shield/water bucket/pearl)
+        reeling = L.combo_taken > 0
+        escape_ready = reeling & (L.escape_cd <= 0.0) & (L.shield_disabled <= 0.0)
+        m = a(28) & escape_ready
+        if m.any():
+            # consume the cheapest available escape tool
+            shield_first = m & L.has_shield
+            water_next = m & (~shield_first) & (L.water_bk > 0)
+            pearl_next = m & (~shield_first) & (~water_next) & (L.pearls > 0)
+            L.shield_up = np.where(shield_first, True, L.shield_up)
+            L.water_bk = np.where(water_next, np.maximum(0.0, L.water_bk - 1), L.water_bk)
+            L.pearls = np.where(pearl_next, L.pearls - 1, L.pearls)
+            L.fire = np.where(water_next, 0.0, L.fire)
+            L.web = np.where(water_next, 0.0, L.web)
+            # blink away from the attacker when a pearl is spent
+            L.pos = np.where(pearl_next[:, None],
+                             np.clip(L.pos - fwd * 4.0, -ARENA_BOUND, ARENA_BOUND), L.pos)
+            # reset the chain, gain brief i-frames and a punishment window
+            L.combo_taken = np.where(m, 0, L.combo_taken)
+            L.combo_window = np.where(m, 0.0, L.combo_window)
+            L.stun = np.where(m, 0.0, L.stun)
+            L.hurt_cd = np.where(m, COMBO_BREAK_LOCK, L.hurt_cd)
+            L.escape_cd = np.where(m, 1.2, L.escape_cd)
+            # the escape physically creates the gap the counter needs
+            L.pos = np.where(m[:, None],
+                             np.clip(L.pos - fwd * 1.2, -ARENA_BOUND, ARENA_BOUND), L.pos)
+            L.cd = np.where(m, np.minimum(L.cd, 0.02), L.cd)
+            L.counter_until = np.where(m, COUNTER_WINDOW, L.counter_until)
+            E.combo_taken = np.where(m, 0, E.combo_taken)  # the chain is broken
+            E.stun = np.where(m, np.maximum(E.stun, 0.6), E.stun)
+            L.vel -= fwd * np.where(m, 5.0, 0.0)[:, None]
+            tech = np.where(m, T_COMBO_BREAK, tech)
+            flags["combo_broken"] |= m
+        waste |= a(28) & ~m
+
+        # --- 29 combo counter: punish while the attacker is recovering.
+        # The request is buffered: it fires as soon as the swing cooldown allows,
+        # which makes the behaviour learnable instead of a 1-frame race.
+        punish_window = (L.counter_until > 0.0) | (E.stun > 0.0)
+        request = a(29) & (punish_window | (L.counter_armed > 0.0))
+        L.counter_armed = np.where(request, 1.2, L.counter_armed)
+        m = (L.counter_armed > 0.0) & (dist <= REACH + 0.75) & (L.cd <= 0.05)
+        if m.any():
+            L.counter_armed = np.where(m, 0.0, L.counter_armed)
+            bonus_mult = 1.6
+            L.vel += fwd * np.where(m, 3.0, 0.0)[:, None]
+            counter_attack = m.copy()
+            want_attack |= m          # the punish is a real swing, not just a flag
+            tech = np.where(m, T_COMBO_COUNTER, tech)
+            flags["combo_countered"] |= m
+        else:
+            counter_attack = np.zeros(n, bool)
+        waste |= a(29) & ~m
+
         # ---- learner vertical physics
         jump_ok = want_jump & (L.y <= 1e-4) & (L.web <= 0)
         L.vy = np.where(jump_ok, 8.4, L.vy)
@@ -1304,6 +1508,13 @@ class ProArena:
             B.use_lock = np.maximum(0.0, B.use_lock - DT)
             B.regen = np.maximum(0.0, B.regen - DT)
             B.cage_until = np.maximum(0.0, B.cage_until - DT)
+            B.stun = np.maximum(0.0, B.stun - DT)
+            B.combo_window = np.maximum(0.0, B.combo_window - DT)
+            B.escape_cd = np.maximum(0.0, B.escape_cd - DT)
+            B.counter_until = np.maximum(0.0, B.counter_until - DT)
+            B.counter_armed = np.maximum(0.0, B.counter_armed - DT)
+            # a chain that is not continued (or escaped) expires
+            B.combo_taken = np.where(B.combo_window <= 0.0, 0, B.combo_taken)
 
         # regen
         before = L.hp
@@ -1331,7 +1542,7 @@ class ProArena:
         cover = self._obstacle_between(L.pos, E.pos)
         eff_reach = REACH + np.where(L.pillar > 0, 0.30, 0.0)
         swing = (want_attack & (L.use_lock <= 0.0) & (L.cd <= 0.04) & (re_dist <= eff_reach)
-                 & ((~cover) | (L.pillar > 0)))
+                 & ((~cover) | (L.pillar > 0)) & (L.stun <= 0.0))
         e_shield = E.has_shield & E.shield_up & (E.shield_disabled <= 0)
         break_shield = swing & e_shield & L.is_axe()
         blocked = swing & e_shield & (~L.is_axe())
@@ -1340,7 +1551,9 @@ class ProArena:
         mult = np.where(crit, 1.5, 1.0)
         mult = np.where(wtap_attack & real, mult * 1.15, mult)
         bonus = np.where(L.buff > 0, 3.0, 0.0)
-        raw = np.where(real, (L.dmg() + bonus) * mult, 0.0)
+        combo_ramp = np.minimum(1.4, 1.0 + COMBO_RAMP * E.combo_taken)
+        counter_mult = np.where(counter_attack, 1.6, 1.0)
+        raw = np.where(real, (L.dmg() + bonus) * mult * combo_ramp * counter_mult, 0.0)
         dealt, pop = self._damage(E, raw, blast=False)
         dmg_dealt += dealt
         flags["totem_popped_enemy"] |= pop
@@ -1349,6 +1562,11 @@ class ProArena:
         kb = np.where(real & (dealt > 0), base_kb, 0.0)
         kb = np.where(wtap_attack, 0.0, kb)  # W-tap cancels knockback
         E.vel += hit_dir * kb[:, None]
+        hit_landed = real & (dealt > 0.0)
+        E.combo_taken = np.where(hit_landed, E.combo_taken + 1, E.combo_taken)
+        E.combo_window = np.where(hit_landed, COMBO_WINDOW, E.combo_window)
+        E.stun = np.where(hit_landed, np.maximum(E.stun, COMBO_STUN), E.stun)
+        flags["combo_hit"] |= hit_landed
         flags["wtap_combo"] |= wtap_attack & real
         flags["shield_broken"] |= break_shield
         flags["blocked_hit"] |= blocked
@@ -1357,6 +1575,11 @@ class ProArena:
                         L.cd)
 
         L.cobwebs = np.maximum(L.cobwebs, 0.0)
+
+        # ---- combo bookkeeping (done centrally so nothing gets lost between dicts)
+        if not self.pve:
+            self._got_comboed = self._got_comboed | (self._prev_chain > 0) | (L.combo_taken > 0)
+            self._prev_chain = L.combo_taken.copy()
 
         # ---- termination
         learner_dead = L.hp <= DEATH
@@ -1380,6 +1603,11 @@ class ProArena:
         reward += np.where(flags["totem_popped_enemy"], 8.0, 0.0)
         reward -= np.where(flags["self_blast"], 3.0, 0.0)
         reward -= np.where(waste, 1.5, 0.0)
+        # --- combo play ---
+        reward += np.where(flags["combo_hit"], 1.2, 0.0)
+        reward += np.where(flags["combo_broken"], 7.0, 0.0)
+        reward += np.where(flags["combo_countered"], 8.0, 0.0)
+        reward -= np.where(flags["enemy_combo_broken"], 4.0, 0.0)
 
         prev_dist = brain["dist"]
         new_dist = re_dist
@@ -1401,6 +1629,11 @@ class ProArena:
             "tech": tech, "waste": waste,
             "human_tech": (self.human_tech.copy() if self._human_action is not None
                            and self.pve else np.zeros(n, np.int32)),
+            "combo_taken": L.combo_taken.copy(), "combo_landed": E.combo_taken.copy(),
+            "human_combo_broken": self._human_broke.copy(),
+            "human_combo_countered": self._human_countered.copy(),
+            "got_comboed": self._got_comboed.copy(),
+            "stun": L.stun.copy(),
             **{k: v for k, v in flags.items()},
         }
         obs = self._obs()
@@ -1505,6 +1738,20 @@ class ProPvPVecEnv(VecEnv):
         self.draws = 0
         self.tech_counts = {name: 0 for name in TECHNIQUES if name != "none"}
         self.last_results: list[str] = []
+        # combo bookkeeping (per fight, then averaged)
+        self.combo_breaks = 0
+        self.combo_counters = 0
+        self.combo_hits = 0
+        self.chains_suffered = 0
+        self.chain_len_sum = 0
+
+    def set_combo_curriculum(self, share: float) -> None:
+        """Share (0..1) of new fights that start with the learner already in a chain."""
+        self.combo_curriculum = float(np.clip(share, 0.0, 0.9))
+
+    def set_aggression(self, value: float) -> None:
+        """0..1 — how relentlessly the scripted pro chases combo chains."""
+        self.e_aggression = float(np.clip(value, 0.0, 1.0))
 
     def set_ai_action(self, action) -> None:
         """Queue the action the AI opponent should execute on the next step."""
@@ -1520,6 +1767,16 @@ class ProPvPVecEnv(VecEnv):
     def set_enemy_skill(self, value: float) -> None:
         self.core.set_enemy_skill(value)
 
+    def set_combo_curriculum(self, share: float) -> None:
+        """Share (0..1) of new fights that start with the learner already in a chain."""
+        self.combo_curriculum = float(np.clip(share, 0.0, 0.9))
+
+    def set_aggression(self, value: float) -> None:
+        self.core.set_aggression(value)
+
+    def set_combo_curriculum(self, share: float) -> None:
+        self.core.set_combo_curriculum(share)
+
     def reset(self):
         self._obs = self.core.reset()
         return self._obs.copy()
@@ -1529,6 +1786,9 @@ class ProPvPVecEnv(VecEnv):
 
     def step_wait(self):
         obs, rew, term, trunc, done, info = self.core.step(self._actions)
+        self.combo_breaks += int(np.count_nonzero(info["combo_broken"]))
+        self.combo_counters += int(np.count_nonzero(info["combo_countered"]))
+        self.combo_hits += int(np.count_nonzero(info["combo_hit"]))
         infos: list[dict] = [{} for _ in range(self.num_envs)]
         done_idx = np.flatnonzero(done)
         if len(done_idx):
@@ -1538,6 +1798,9 @@ class ProPvPVecEnv(VecEnv):
                 won = bool(info["enemy_dead"][i]) and not bool(info["learner_dead"][i])
                 lost = bool(info["learner_dead"][i]) and not bool(info["enemy_dead"][i])
                 self.episodes += 1
+                self.chain_len_sum += int(info["combo_taken"][i])
+                if int(info["combo_taken"][i]) > 0:
+                    self.chains_suffered += 1
                 if won:
                     self.wins += 1
                     self.last_results.append("W")
@@ -1573,6 +1836,10 @@ class ProPvPVecEnv(VecEnv):
                     "cage_blocked": bool(info["cage_blocked"][i]),
                     "shield_broken": bool(info["shield_broken"][i]),
                     "totems_popped": int(info["totem_popped_enemy"][i]) + int(info["totem_popped_learner"][i]),
+                    "combo_taken": int(info["combo_taken"][i]),
+                    "combo_landed": int(info["combo_landed"][i]),
+                    "combo_broken": bool(info["combo_broken"][i]),
+                    "combo_countered": bool(info["combo_countered"][i]),
                     "consumables_summary": cons,
                 }
                 row_mask[i] = True

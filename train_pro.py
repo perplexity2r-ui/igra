@@ -34,6 +34,8 @@ class ProMetrics:
         self.tech = {k: 0 for k in TECH_KEYS}
         self.kills_by_crystal = 0
         self.recent: list[int] = []
+        self.combo = {"breaks": 0, "counters": 0, "hits": 0,
+                      "chains": 0, "chain_len": 0}
 
     def absorb(self, env: ProPvPVecEnv) -> None:
         self.fights = env.episodes
@@ -43,6 +45,11 @@ class ProMetrics:
         for k, v in env.tech_counts.items():
             self.tech[k] = v
         self.recent = env.last_results
+        self.combo = {
+            "breaks": env.combo_breaks, "counters": env.combo_counters,
+            "hits": env.combo_hits, "chains": env.chains_suffered,
+            "chain_len": env.chain_len_sum,
+        }
 
     @property
     def win_rate(self) -> float:
@@ -92,8 +99,22 @@ def warm_start(model: PPO, path: str) -> None:
                 r = min(op.shape[0], new_param.shape[0])
                 new_param[:r].copy_(op[:r])
                 copied += 1
-    model.policy.load_state_dict(new_sd)
+    model.policy.load_state_dict(new_sd, strict=False)
     print(f"Warm-started {copied} tensor layers from {path}", flush=True)
+    # Only neutralise rows 28/29 when the head actually GREW (a brand-new action space).
+    # When fine-tuning a model that already knows them, keep what was learned.
+    import torch as _t
+    grew = old_sd.get("action_net.bias") is None or \
+        old_sd["action_net.bias"].shape[0] < model.policy.state_dict()["action_net.bias"].shape[0]
+    if grew:
+        with _t.no_grad():
+            for key in ("action_net.weight", "action_net.bias"):
+                p_ = model.policy.state_dict().get(key)
+                if p_ is not None and p_.shape[0] > 28:
+                    p_[28:] *= 0.02
+        print("Action head rows 28/29 (combo break / counter) initialised neutral", flush=True)
+    else:
+        print("Combo actions kept from the warm-start model", flush=True)
 
 
 def main() -> None:
@@ -148,6 +169,10 @@ def main() -> None:
         progress = min(1.0, metrics.fights / max(1.0, fight_target * 0.85))
         skill = 0.30 + 0.70 * progress
         env.set_enemy_skill(skill)
+        # combo curriculum: the opponent starts casual and becomes a chain machine
+        env.set_aggression(min(1.0, 0.55 + 0.45 * progress))
+        # combo curriculum: up to 45% of fights begin with the learner already reeling
+        env.set_combo_curriculum(0.45 * min(1.0, progress * 1.4))
 
         model.learn(total_timesteps=steps_per_rollout, reset_num_timesteps=False, log_interval=None)
         total_timesteps += steps_per_rollout
@@ -165,7 +190,11 @@ def main() -> None:
                 f"crystals={metrics.tech.get('end_crystal', 0):,} "
                 f"anchors={metrics.tech.get('respawn_anchor', 0):,} "
                 f"carts={metrics.tech.get('tnt_minecart', 0):,} "
-                f"wtap={metrics.tech.get('wtap_combo', 0):,}",
+                f"wtap={metrics.tech.get('wtap_combo', 0):,} | "
+                f"combo: hits={metrics.combo['hits']:,} "
+                f"breaks={metrics.combo['breaks']:,} "
+                f"counters={metrics.combo['counters']:,} "
+                f"chains={metrics.combo['chains']:,}",
                 flush=True,
             )
             status = {
@@ -177,6 +206,7 @@ def main() -> None:
                 "timesteps": total_timesteps,
                 "elapsed_sec": round(el, 1),
                 "fights_per_sec": round(metrics.fights / max(el, 1e-6), 1),
+                "combos": dict(metrics.combo),
                 "techniques": dict(sorted(metrics.tech.items())),
                 "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             }
@@ -184,6 +214,8 @@ def main() -> None:
             tmp.write_text(json.dumps(status, indent=2), encoding="utf-8")
             tmp.replace(status_file)
             dumps += 1
+            if dumps == 1:
+                model.save(str(save_path.parent / f"{save_path.name}_mid"))
             if dumps % 3 == 0:
                 model.save(str(ckpt_dir / f"pro_{metrics.fights:07d}"))
                 # keep the checkpoint folder tidy
@@ -202,6 +234,7 @@ def main() -> None:
         "win_rate_recent_200": round(metrics.win_rate, 4),
         "timesteps": total_timesteps,
         "elapsed_sec": round(time.time() - start, 1),
+        "combos": dict(metrics.combo),
         "techniques": dict(sorted(metrics.tech.items())),
     }
     (save_path.parent / "pro_training_summary.json").write_text(

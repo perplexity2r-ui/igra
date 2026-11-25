@@ -362,6 +362,21 @@ function startPvPServer({
     } else if (cmd === '/arena' && parts[1] === 'wtap' && parts[2]) {
       const p = findPlayerByName(parts[2])
       if (p) pushEvent(`⚡ ${p.username} executed a W-TAP sprint-reset combo`)
+    } else if (cmd === '/arena' && parts[1] === 'combobreak' && parts[2]) {
+      const p = findPlayerByName(parts[2])
+      if (p) pushEvent(`🛡️ ${p.username} BROKE OUT of a combo chain`)
+    } else if (cmd === '/arena' && parts[1] === 'counter' && parts[2]) {
+      const p = findPlayerByName(parts[2])
+      if (p) pushEvent(`⚔️ ${p.username} landed a COMBO COUNTER`)
+    } else if (cmd === '/arena' && parts[1] === 'blink' && parts[3] && parts[4]) {
+      const p = findPlayerByName(parts[2])
+      if (p) {
+        p.x = Number(parts[3]) || p.x
+        p.z = Number(parts[4]) || p.z
+        p.velocity = { x: 0, y: 0, z: 0 }
+        try { p.client.write('position', { x: p.x, y: p.y, z: p.z, yaw: 0, pitch: 0, flags: 0, teleportId: 1 }) } catch {}
+        pushEvent(`🔮 ${p.username} pearl-blinked away to escape`)
+      }
     } else if (cmd === '/give' && parts[1] && parts[2]) {
       const p = findPlayerByName(parts[1])
       if (!p) return

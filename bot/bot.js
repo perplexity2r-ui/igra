@@ -141,8 +141,18 @@ let enemySpawned = false
 let learnerReconnecting = false
 let enemyReconnecting = false
 
-let lLoad = rollRandomLoadout()
-let eLoad = rollRandomLoadout(lLoad.weaponIdx, lLoad.armorIdx)
+function initComboState(load) {
+  load.comboTaken = 0
+  load.comboWindowUntil = 0
+  load.stunUntil = 0
+  load.hurtCdUntil = 0
+  load.counterUntil = 0
+  load.counterArmedUntil = 0
+  return load
+}
+
+let lLoad = initComboState(rollRandomLoadout())
+let eLoad = initComboState(rollRandomLoadout(lLoad.weaponIdx, lLoad.armorIdx))
 
 let lastAttackTime = 0
 let lastEnemyAttackTime = 0
@@ -302,8 +312,8 @@ function resetEpisode() {
   obstacleCount = 0
 
   // Roll completely independent, asymmetric random inventories for each bot!
-  lLoad = rollRandomLoadout()
-  eLoad = rollRandomLoadout(lLoad.weaponIdx, lLoad.armorIdx)
+  lLoad = initComboState(rollRandomLoadout())
+  eLoad = initComboState(rollRandomLoadout(lLoad.weaponIdx, lLoad.armorIdx))
 
   const cmds = [
     // Clean any placed blocks, cobwebs, water, or lava inside the 20x20 arena!
@@ -370,9 +380,24 @@ function placeBlockBetween(actorBot, targetPos, blockId) {
   }
 }
 
+function noteComboHit(attacker, victimLoad, now) {
+  // a landed hit extends the victim's chain and stuns them briefly
+  victimLoad.comboTaken = (victimLoad.comboTaken || 0) + 1
+  victimLoad.comboWindowUntil = now + 1600
+  victimLoad.stunUntil = now + 450
+  victimLoad.hurtCdUntil = now + 500
+}
+
+function tickCombos(now) {
+  for (const load of [lLoad, eLoad]) {
+    if (!load) continue
+    if (load.comboWindowUntil && now > load.comboWindowUntil) load.comboTaken = 0
+  }
+}
+
 function getObservation() {
   if (!botsReady()) {
-    return new Array(30).fill(0)
+    return new Array(34).fill(0)
   }
   const now = Date.now()
   const lp = learner.entity.position
@@ -414,6 +439,10 @@ function getObservation() {
     clamp(((eLoad.crystals || 0) + (eLoad.anchors || 0) + (eLoad.minecarts || 0)) / 10, 0, 1),
     clamp((lLoad.obsidian || 0) / 16, 0, 1),
     now < (lLoad.cageUntil || 0) ? 1 : 0,
+    clamp((lLoad.comboTaken || 0) / 5, 0, 1),
+    clamp((lLoad.stunUntil && now < lLoad.stunUntil ? (lLoad.stunUntil - now) / 1000 : 0), 0, 1),
+    clamp((eLoad.comboTaken || 0) / 5, 0, 1),
+    clamp((lLoad.hurtCdUntil && now < lLoad.hurtCdUntil && (lLoad.comboTaken || 0) > 0) ? 1 : 0, 0, 1),
   ]
 }
 
@@ -438,6 +467,7 @@ function doAction(action) {
   let placedBlock = null
 
   const tryAttack = () => {
+    if (lLoad.stunUntil && now < lLoad.stunUntil) return   // reeling: cannot swing
     if (now - lastAttackTime >= lLoad.weapon.cdMs - 25 && targetEntity) {
       const dist = learner.entity.position.distanceTo(targetEntity.position)
       if (dist <= 3.5) {
@@ -445,6 +475,7 @@ function doAction(action) {
           equipMainWeapon(learner, lLoad)
           learner.attack(targetEntity)
           lastAttackTime = now
+          noteComboHit(learner, eLoad, now)
           if (lLoad.weapon.shieldBreak && eLoad.shieldUp && now >= eLoad.shieldDisabledUntil) {
             eLoad.shieldUp = false
             eLoad.shieldDisabledUntil = now + 5000
@@ -768,6 +799,57 @@ function doAction(action) {
       }
       break
     }
+    case 28: {
+      // COMBO BREAK: shield/water/pearl out of an incoming chain
+      if ((lLoad.comboTaken || 0) > 0) {
+        usedConsumable = 'combo_break'
+        if (lLoad.hasShield) {
+          lLoad.shieldUp = true
+        } else if ((lLoad.waterBuckets || 0) > 0) {
+          lLoad.waterBuckets -= 1
+          placedBlock = 'minecraft:water'
+        } else if ((lLoad.pearls || 0) > 0) {
+          lLoad.pearls -= 1
+          try {
+            const away = learner.entity.position.offset(0, 0, 0)
+            if (equipItemByKeyword(learner, 'ender_pearl', 'hand')) learner.activateItem()
+            learner.chat(`/arena blink ${learner.username} ${Math.round(away.x)} ${Math.round(away.z)} 4`)
+          } catch {}
+        }
+        // chain resets, brief i-frames and a punishment window
+        lLoad.comboTaken = 0
+        lLoad.comboWindowUntil = 0
+        lLoad.stunUntil = 0
+        lLoad.hurtCdUntil = now + 180
+        lLoad.counterUntil = now + 1000
+        try { learner.chat(`/arena combobreak ${learner.username}`) } catch {}
+      } else {
+        wastedConsumable = true
+      }
+      break
+    }
+    case 29: {
+      // COMBO COUNTER: buffer the punish request — it fires as soon as the swing lands
+      const punishable = (lLoad.counterUntil || 0) > now || (eLoad.stunUntil || 0) > now
+                         || (lLoad.counterArmedUntil || 0) > now
+      if (punishable && targetEntity) {
+        lLoad.counterArmedUntil = now + 1200
+        const dist = learner.entity.position.distanceTo(targetEntity.position)
+        if (dist <= 4.0) {
+          lLoad.counterArmedUntil = 0
+          usedConsumable = 'combo_counter'
+          try {
+            learner.setControlState('sprint', true)
+            learner.setControlState('forward', true)
+            tryAttack()
+            learner.chat(`/arena counter ${learner.username}`)
+          } catch {}
+        }
+      } else {
+        wastedConsumable = true
+      }
+      break
+    }
     default: break
   }
 
@@ -802,6 +884,7 @@ function enemyCage() {
 const enemyTimer = setInterval(() => {
   if (!botsReady() || episodeDone || resetting) return
   const now = Date.now()
+  tickCombos(now)
   const targetEntity = getPeerEntity(enemy, learner)
   if (!targetEntity) return
   const dist = enemy.entity.position.distanceTo(targetEntity.position)
@@ -813,11 +896,13 @@ const enemyTimer = setInterval(() => {
 
   const enemySwing = () => {
     if (!targetEntity) return
+    if (eLoad.stunUntil && now < eLoad.stunUntil) return
     if (now - lastEnemyAttackTime < eLoad.weapon.cdMs) return
     try {
       equipMainWeapon(enemy, eLoad)
       enemy.attack(targetEntity)
       lastEnemyAttackTime = now
+      noteComboHit(enemy, lLoad, now)
       if (eLoad.weapon.shieldBreak && lLoad.shieldUp && now >= lLoad.shieldDisabledUntil) {
         lLoad.shieldUp = false
         lLoad.shieldDisabledUntil = now + 5000

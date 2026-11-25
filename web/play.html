@@ -112,6 +112,9 @@
       <h3>Твоё здоровье</h3>
       <div class="bar"><i class="hpYou" id="hpYouBar" style="width:100%"></i></div>
       <div class="row"><span id="hpYouTxt">20.0 / 20</span><span id="youState"></span></div>
+      <div class="row" id="comboRow" style="display:none">
+        <span>Тебя в комбо</span><span id="comboTaken">0</span>
+      </div>
       <div class="kit" id="youKit"></div>
     </div>
 
@@ -141,16 +144,23 @@ const PAD = [
   [17, 'Дальний бой', '4'], [19, 'Паутина/лава', '5'], [20, 'Вода', '6'], [13, 'Геппл', '1'],
   [14, 'Хил', '7'],    [16, 'Бафф', '8'],    [15, 'Перл', '9'],         [22, 'Кристалл', 'C'],
   [23, 'Якорь', 'V'],  [24, 'TNT-вагонетка', 'B'], [25, 'Клетка', 'N'], [27, 'Перл+кристалл', 'M'],
+  [28, 'ВЫЙТИ ИЗ КОМБО', 'R'], [29, 'КОНТР-КОМБО', 'T'],
 ];
 const KEYMAP = { 'e': 5, 'w': 1, 'a': 3, 's': 2, 'd': 4, ' ': 8, 'q': 12, 'x': 26,
                  '1': 13, '2': 21, '3': 18, '4': 17, '5': 19, '6': 20,
-                 '7': 14, '8': 16, '9': 15, 'c': 22, 'v': 23, 'b': 24, 'n': 25, 'm': 27 };
+                 '7': 14, '8': 16, '9': 15, 'c': 22, 'v': 23, 'b': 24, 'n': 25, 'm': 27,
+                 'r': 28, 't': 29 };
 
 const padEl = document.getElementById('pad');
 for (const [id, label, key] of PAD) {
   const b = document.createElement('button');
   b.innerHTML = label + (key ? ` <span style="opacity:.45;font-size:10px">${key}</span>` : '');
   b.title = 'Действие ' + id;
+  if (id === 28 || id === 29) {
+    b.style.background = id === 28 ? '#3f1d1d' : '#1d2f3f';
+    b.style.borderColor = id === 28 ? '#7f2d2d' : '#2d5a7f';
+    b.style.fontWeight = '600';
+  }
   b.onclick = () => sendAction(id);
   padEl.appendChild(b);
 }
@@ -224,6 +234,13 @@ function applyState(s) {
     (s.ai.absorption > 0.05 ? `  +${s.ai.absorption.toFixed(1)}🛡` : '');
 
   document.getElementById('youState').textContent = bits(s.you);
+  const comboRow = document.getElementById('comboRow');
+  if (s.you.combo_taken > 0) {
+    comboRow.style.display = 'flex';
+    document.getElementById('comboTaken').textContent = s.you.combo_taken + ' — жми R!';
+  } else {
+    comboRow.style.display = 'none';
+  }
   document.getElementById('aiState').textContent = bits(s.ai);
 
   document.getElementById('youKit').innerHTML = kitLine(s.you);

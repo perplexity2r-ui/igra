@@ -1,6 +1,6 @@
 """Gymnasium environment for Minecraft PvP (1.16.5) — Pro Meta Crystal, TNT-Cart & Anchor Mode.
 
-Talks to `bot/bot.js` over WebSocket (`Box(30,)` observations, `Discrete(28)` actions).
+Talks to `bot/bot.js` over WebSocket (`Box(34,)` observations, `Discrete(30)` actions).
 """
 from __future__ import annotations
 
@@ -30,9 +30,9 @@ class MinecraftPvPEnv(gym.Env):
         self.delay = delay
         self.ready_retries = ready_retries
 
-        self.action_space = spaces.Discrete(28)
+        self.action_space = spaces.Discrete(30)
         self.observation_space = spaces.Box(
-            low=-1.0, high=2.0, shape=(30,), dtype=np.float32
+            low=-1.0, high=2.0, shape=(34,), dtype=np.float32
         )
         self.ws: websocket.WebSocket | None = None
         self._prev_dist: float | None = None
