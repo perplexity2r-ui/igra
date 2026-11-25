@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[36,)"
+license="MIT"
+
+[[mods]]
+modId="aipilot"
+version="1.0.0"
+displayName="AI Pilot — авто-бой"
+displayTest="IGNORE_ALL_VERSION"
+description='''
+Клиентский авто-бой для Minecraft 1.16.5 Forge.
+
+Нажми O — и мод берёт управление персонажем на себя: сам подходит к цели,
+держит прицел, бьёт по кулдауну, прыгает на крит, делает W-tap, держит щит,
+ест при низком HP и выходит из комбо противника.
+
+Работает поверх обычного клиента (Forge 1.16.5), устанавливается только на клиент.
+'''
+
+[[dependencies.aipilot]]
+    modId="forge"
+    mandatory=true
+    versionRange="[36,)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.aipilot]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.16.5,1.17)"
+    ordering="NONE"
+    side="CLIENT"
