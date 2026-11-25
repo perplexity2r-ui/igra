@@ -30,7 +30,10 @@ jobs:
         id: buildstep
         working-directory: forge-mod
         continue-on-error: true
-        run: gradle build --no-daemon --stacktrace -x test 2>&1 | tee build.log
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle build --no-daemon --stacktrace -x test 2>&1 | tee build.log
 
       - name: Publish log to issue on failure
         if: steps.buildstep.outcome == 'failure'
