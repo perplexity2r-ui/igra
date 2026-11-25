@@ -14,6 +14,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        gradle: ['7.1.1', '7.4.2', '7.6.4']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,10 +28,10 @@ jobs:
           distribution: temurin
           java-version: '8'
 
-      - name: Set up Gradle
+      - name: Set up Gradle ${{ matrix.gradle }}
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '7.6.4'
+          gradle-version: ${{ matrix.gradle }}
 
       - name: Build
         id: buildstep
@@ -36,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          gradle build --no-daemon --stacktrace -x test 2>&1 | tee build.log
+          gradle build --no-daemon -x test 2>&1 | tee build.log
 
       - name: Publish result branch
         working-directory: forge-mod
@@ -46,21 +50,20 @@ jobs:
           cd ..
           git config user.name "ci-bot"
           git config user.email "ci@users.noreply.github.com"
-          BRANCH=forge-dist
+          BRANCH="forge-dist-${{ matrix.gradle }}"
+          mkdir -p dist
+          cp forge-mod/build.log dist/build.log
           if [ "${{ steps.buildstep.outcome }}" = "success" ]; then
-            mkdir -p dist
             cp forge-mod/build/libs/*.jar dist/aipilot-1.16.5.jar
-            cp forge-mod/build.log dist/build.log
-            MSG="AI Pilot build OK (${GITHUB_SHA::7})"
+            echo "${{ matrix.gradle }}" > dist/gradle-version.txt
+            MSG="AI Pilot build OK gradle=${{ matrix.gradle }} (${GITHUB_SHA::7})"
           else
-            mkdir -p dist
-            cp forge-mod/build.log dist/build.log
-            MSG="AI Pilot build FAILED (${GITHUB_SHA::7})"
+            MSG="AI Pilot build FAILED gradle=${{ matrix.gradle }} (${GITHUB_SHA::7})"
           fi
-          git checkout -q -B $BRANCH
+          git checkout -q -B "$BRANCH"
           git add -f dist
           git commit -q -m "$MSG" || echo "nothing to commit"
-          git push -f origin $BRANCH
+          git push -f origin "$BRANCH"
 
       - name: Fail job if build failed
         if: steps.buildstep.outcome == 'failure'
