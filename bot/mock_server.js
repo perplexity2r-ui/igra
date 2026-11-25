@@ -636,6 +636,20 @@ function startPvPServer({
       if (d.status === 5) state.shieldUp = false
     })
 
+    // Vanilla keep-alive: without it Mineflayer drops the connection with KeepAliveTimeout
+    let keepAliveTimer = null
+    const startKeepAlive = () => {
+      if (keepAliveTimer) return
+      keepAliveTimer = setInterval(() => {
+        try {
+          client.write('keep_alive', { keepAliveId: BigInt(Date.now()) })
+        } catch {}
+      }, 10000)
+    }
+    startKeepAlive()
+    client.on('keep_alive', () => {
+      state.lastKeepAlive = Date.now()
+    })
     client.on('chat', (d) => {
       const msg = d.message || ''
       if (msg.startsWith('/')) handleCommand(state, msg)
@@ -701,6 +715,7 @@ function startPvPServer({
     })
 
     client.on('end', () => {
+      if (keepAliveTimer) { clearInterval(keepAliveTimer); keepAliveTimer = null }
       players.delete(entityId)
       broadcastExcept(entityId, 'entity_destroy', { entityIds: [entityId] })
     })
