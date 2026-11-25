@@ -1,7 +1,7 @@
 package com.arena.aipilot;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.util.text.StringTextComponent;
 import net.minecraftforge.client.event.InputUpdateEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
@@ -57,7 +57,7 @@ public class AiPilot {
     public static void chat(String msg) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.displayClientMessage(new TextComponent(msg), false);
+            mc.player.displayClientMessage(new StringTextComponent(msg), false);
         }
     }
 

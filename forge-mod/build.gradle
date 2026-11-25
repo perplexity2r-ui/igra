@@ -18,7 +18,7 @@ sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
 minecraft {
-    // The sources use Mojang's official 1.16.5 names (LocalPlayer, AABB, etc.).
+    // Forge 1.16 keeps MCP class names but applies Mojang's official member names.
     mappings channel: 'official', version: '1.16.5'
 
     runs {

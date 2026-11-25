@@ -1,25 +1,26 @@
 package com.arena.aipilot;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.AxeItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.SwordItem;
-import net.minecraft.world.item.TridentItem;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.client.player.Input;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.client.entity.player.ClientPlayerEntity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.ai.attributes.AttributeModifier;
+import net.minecraft.entity.ai.attributes.Attributes;
+import net.minecraft.entity.item.ArmorStandEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.EquipmentSlotType;
+import net.minecraft.item.AxeItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ShieldItem;
+import net.minecraft.item.SwordItem;
+import net.minecraft.item.TridentItem;
+import net.minecraft.util.Hand;
+import net.minecraft.util.MovementInput;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.vector.Vector3d;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 
 import java.util.List;
@@ -120,7 +121,7 @@ public final class AiPilotEngine {
     }
 
     public static String statusLine() {
-        LocalPlayer p = Minecraft.getInstance().player;
+        ClientPlayerEntity p = Minecraft.getInstance().player;
         String hp = p == null ? "-" : String.format(Locale.ROOT, "%.1f", p.getHealth());
         return "\u00A7bAI Pilot \u00A77| \u00A7f" + (AiPilot.isEnabled() ? "ВКЛ" : "ВЫКЛ")
                 + " \u00A77| стиль \u00A7f" + style.label
@@ -133,7 +134,7 @@ public final class AiPilotEngine {
     // ------------------------------------------------------------------ brain
     /** Вызывается каждый тик игрока (Phase.START), до отправки позиции на сервер. */
     public static void tick(Minecraft mc) {
-        LocalPlayer p = mc.player;
+        ClientPlayerEntity p = mc.player;
         if (p == null || mc.level == null || mc.gameMode == null) return;
         if (mc.screen != null) {                 // открыт инвентарь/чат — не мешаем
             releaseKeys(mc);
@@ -147,8 +148,8 @@ public final class AiPilotEngine {
         // 1. выбор цели
         if (target == null || !target.isAlive() || target.level != p.level
                 || p.distanceTo(target) > searchRange
-                || (target instanceof Player && (((Player) target).isCreative()
-                    || ((Player) target).isSpectator()))) {
+                || (target instanceof PlayerEntity && (((PlayerEntity) target).isCreative()
+                    || ((PlayerEntity) target).isSpectator()))) {
             target = findTarget(mc, p);
         }
 
@@ -191,22 +192,22 @@ public final class AiPilotEngine {
     }
 
     // -------------------------------------------------------------- targeting
-    private static LivingEntity findTarget(Minecraft mc, LocalPlayer p) {
-        AABB box = p.getBoundingBox().inflate(searchRange, 6.0, searchRange);
+    private static LivingEntity findTarget(Minecraft mc, ClientPlayerEntity p) {
+        AxisAlignedBB box = p.getBoundingBox().inflate(searchRange, 6.0, searchRange);
         List<LivingEntity> list = mc.level.getEntitiesOfClass(LivingEntity.class, box,
-                e -> e != p && e.isAlive() && e.isPickable() && !(e instanceof ArmorStand)
-                        && !(e instanceof Player && (((Player) e).isCreative()
-                             || ((Player) e).isSpectator())));
+                e -> e != p && e.isAlive() && e.isPickable() && !(e instanceof ArmorStandEntity)
+                        && !(e instanceof PlayerEntity && (((PlayerEntity) e).isCreative()
+                             || ((PlayerEntity) e).isSpectator())));
         LivingEntity best = null;
         double bestScore = Double.MAX_VALUE;
-        Vec3 eye = p.position();
+        Vector3d eye = p.position();
         for (LivingEntity e : list) {
             double d = p.distanceTo(e);
             if (d > searchRange) continue;
             // приоритет: игроки и мобы в поле зрения, ближайшие
             double score = d;
             if (!p.hasLineOfSight(e)) score += 4.0;
-            if (e instanceof Player) score -= 1.5;
+            if (e instanceof PlayerEntity) score -= 1.5;
             if (score < bestScore) { bestScore = score; best = e; }
             if (eye.distanceToSqr(e.position()) < 0.0001) continue;
         }
@@ -215,7 +216,7 @@ public final class AiPilotEngine {
     }
 
     // ------------------------------------------------------------------- aim
-    private static void aimAt(LocalPlayer p, LivingEntity t, double dist) {
+    private static void aimAt(ClientPlayerEntity p, LivingEntity t, double dist) {
         double dx = t.getX() - p.getX();
         double dy = (t.getY() + t.getBbHeight() * 0.85) - (p.getY() + p.getEyeHeight());
         double dz = t.getZ() - p.getZ();
@@ -230,7 +231,7 @@ public final class AiPilotEngine {
     }
 
     // -------------------------------------------------------------- movement
-    private static void chase(LocalPlayer p, LivingEntity t, double dist) {
+    private static void chase(ClientPlayerEntity p, LivingEntity t, double dist) {
         inForward = 1.0F;
         inStrafe = 0.0F;
         inBack = false;
@@ -242,14 +243,14 @@ public final class AiPilotEngine {
         p.setSprinting(inSprint);
     }
 
-    private static boolean shouldJump(LocalPlayer p, LivingEntity t, double dist) {
+    private static boolean shouldJump(ClientPlayerEntity p, LivingEntity t, double dist) {
         if (!autoCrit) return false;
         if (!p.onGround()) return false;
         return dist < 3.4 && dist > 1.2 && p.getAttackStrengthScale(0.5F) < 0.6F;
     }
 
     private static void backOff(Minecraft mc) {
-        LocalPlayer p = mc.player;
+        ClientPlayerEntity p = mc.player;
         inForward = -1.0F;
         inStrafe = (p.tickCount % 10 < 5) ? 0.8F : -0.8F;
         inBack = true;
@@ -259,18 +260,18 @@ public final class AiPilotEngine {
         raiseShield(mc, p);
     }
 
-    private static void raiseShield(Minecraft mc, LocalPlayer p) {
+    private static void raiseShield(Minecraft mc, ClientPlayerEntity p) {
         ItemStack main = p.getMainHandItem();
         ItemStack off = p.getOffhandItem();
-        if (off.getItem() instanceof net.minecraft.world.item.ShieldItem) {
-            if (!p.isBlocking()) mc.gameMode.useItem(p, InteractionHand.OFF_HAND);
-        } else if (main.getItem() instanceof net.minecraft.world.item.ShieldItem) {
-            if (!p.isBlocking()) mc.gameMode.useItem(p, InteractionHand.MAIN_HAND);
+        if (off.getItem() instanceof net.minecraft.item.ShieldItem) {
+            if (!p.isBlocking()) mc.gameMode.useItem(p, Hand.OFF_HAND);
+        } else if (main.getItem() instanceof net.minecraft.item.ShieldItem) {
+            if (!p.isBlocking()) mc.gameMode.useItem(p, Hand.MAIN_HAND);
         }
     }
 
     // ---------------------------------------------------------------- attack
-    private static void attack(Minecraft mc, LocalPlayer p, LivingEntity t, double dist) {
+    private static void attack(Minecraft mc, ClientPlayerEntity p, LivingEntity t, double dist) {
         // W-tap: не бьём в спринте — так цель не отлетает и цепочка держится
         boolean wantWTap = dist < 3.4;
         if (wantWTap) p.setSprinting(false);
@@ -281,7 +282,7 @@ public final class AiPilotEngine {
         if (charge >= style.attackThreshold || (crit && charge >= 0.5F)) {
             if (attackingCooldown <= 0) {
                 mc.gameMode.attack(p, t);
-                p.swing(InteractionHand.MAIN_HAND);
+                p.swing(Hand.MAIN_HAND);
                 attackingCooldown = 1;
             }
         }
@@ -295,7 +296,7 @@ public final class AiPilotEngine {
     }
 
     // ----------------------------------------------------------------- eat
-    private static int findFoodSlot(LocalPlayer p) {
+    private static int findFoodSlot(ClientPlayerEntity p) {
         for (int i = 0; i < 9; i++) {
             ItemStack s = p.getInventory().items.get(i);
             if (!s.isEmpty() && s.getItem().isEdible()) return i;
@@ -303,12 +304,12 @@ public final class AiPilotEngine {
         return -1;
     }
 
-    private static void eat(Minecraft mc, LocalPlayer p, int slot) {
+    private static void eat(Minecraft mc, ClientPlayerEntity p, int slot) {
         if (p.getHealth() >= p.getMaxHealth() * 0.92F) { eatSlot = -1; return; }
         ItemStack s = p.getInventory().items.get(slot);
         if (s.isEmpty() || !s.getItem().isEdible()) { eatSlot = -1; return; }
         select(p, slot);
-        if (!p.isUsingItem()) mc.gameMode.useItem(p, InteractionHand.MAIN_HAND);
+        if (!p.isUsingItem()) mc.gameMode.useItem(p, Hand.MAIN_HAND);
         inForward = -0.6F;
         inStrafe = 0.0F;
         inBack = true;
@@ -318,7 +319,7 @@ public final class AiPilotEngine {
     }
 
     // -------------------------------------------------------------- weapons
-    private static void selectBestWeapon(LocalPlayer p) {
+    private static void selectBestWeapon(ClientPlayerEntity p) {
         if (p.isUsingItem()) return;
         int best = -1;
         double bestDmg = -1.0;
@@ -335,19 +336,19 @@ public final class AiPilotEngine {
 
     private static double attackDamage(ItemStack stack) {
         double sum = 0.0;
-        for (AttributeModifier m : stack.getAttributeModifiers(EquipmentSlot.MAINHAND)
+        for (AttributeModifier m : stack.getAttributeModifiers(EquipmentSlotType.MAINHAND)
                 .get(Attributes.ATTACK_DAMAGE)) {
             sum += m.getAmount();
         }
         return sum;
     }
 
-    private static void select(LocalPlayer p, int slot) {
+    private static void select(ClientPlayerEntity p, int slot) {
         p.getInventory().selected = slot;   // клиент синхронизирует слот сам
     }
 
     private static void releaseKeys(Minecraft mc) {
-        LocalPlayer p = mc.player;
+        ClientPlayerEntity p = mc.player;
         inForward = 0.0F;
         inStrafe = 0.0F;
         inJump = false;
@@ -361,7 +362,7 @@ public final class AiPilotEngine {
      * Перехват управления: пока автобой включён, ванильные клавиши игнорируются,
      * а в игру уходят только интенты «мозга». Клиент штатно отправит их на сервер.
      */
-    public static void overrideInputs(Input in) {
+    public static void overrideInputs(MovementInput in) {
         if (!AiPilot.isEnabled() || in == null) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.screen != null) return;
@@ -378,32 +379,32 @@ public final class AiPilotEngine {
     // ------------------------------------------------------------------ HUD
     public static void renderHud(RenderGameOverlayEvent.Text event) {
         Minecraft mc = Minecraft.getInstance();
-        LocalPlayer p = mc.player;
+        ClientPlayerEntity p = mc.player;
         if (p == null) return;
-        List<Component> lines = event.getLeft();
-        ChatFormatting stateColor = AiPilot.isEnabled() ? ChatFormatting.GREEN : ChatFormatting.RED;
-        lines.add(new TextComponent("").append(
-                new TextComponent("AI Pilot ").withStyle(ChatFormatting.AQUA))
-                .append(new TextComponent(AiPilot.isEnabled() ? "ON" : "OFF").withStyle(stateColor))
-                .append(new TextComponent("  [" + style.label + "]").withStyle(ChatFormatting.GRAY)));
+        List<ITextComponent> lines = event.getLeft();
+        TextFormatting stateColor = AiPilot.isEnabled() ? TextFormatting.GREEN : TextFormatting.RED;
+        lines.add(new StringTextComponent("").append(
+                new StringTextComponent("AI Pilot ").withStyle(TextFormatting.AQUA))
+                .append(new StringTextComponent(AiPilot.isEnabled() ? "ON" : "OFF").withStyle(stateColor))
+                .append(new StringTextComponent("  [" + style.label + "]").withStyle(TextFormatting.GRAY)));
 
         if (AiPilot.isEnabled() && target != null) {
             double d = p.distanceTo(target);
             String hp = String.format(Locale.ROOT, "%.1f", target.getHealth());
-            lines.add(new TextComponent(
+            lines.add(new StringTextComponent(
                     "  target: " + target.getName().getString() + "  " + hp + " HP  "
                             + String.format(Locale.ROOT, "%.1f", d) + "m")
-                    .withStyle(ChatFormatting.YELLOW));
+                    .withStyle(TextFormatting.YELLOW));
             int charge = Math.round(p.getAttackStrengthScale(0.5F) * 100.0F);
-            lines.add(new TextComponent("  charge: " + charge + "%")
-                    .withStyle(charge > 95 ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+            lines.add(new StringTextComponent("  charge: " + charge + "%")
+                    .withStyle(charge > 95 ? TextFormatting.GREEN : TextFormatting.GRAY));
             if (escapeTicks > 0) {
-                lines.add(new TextComponent("  \u21B3 escape combo (backpedal + shield)")
-                        .withStyle(ChatFormatting.LIGHT_PURPLE));
+                lines.add(new StringTextComponent("  \u21B3 escape combo (backpedal + shield)")
+                        .withStyle(TextFormatting.LIGHT_PURPLE));
             }
         } else if (AiPilot.isEnabled()) {
-            lines.add(new TextComponent("  no target in " + (int) searchRange + "m")
-                    .withStyle(ChatFormatting.DARK_GRAY));
+            lines.add(new StringTextComponent("  no target in " + (int) searchRange + "m")
+                    .withStyle(TextFormatting.DARK_GRAY));
         }
     }
 }
