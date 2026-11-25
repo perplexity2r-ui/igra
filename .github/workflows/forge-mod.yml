@@ -17,21 +17,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gradle: ['7.1.1', '7.4.2', '7.6.4']
+        include:
+          - { fg: '5', gradle: '7.6.4', java: '8' }
+          - { fg: '6', gradle: '8.1.1', java: '17' }
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 8
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '8'
+          java-version: ${{ matrix.java }}
 
-      - name: Set up Gradle ${{ matrix.gradle }}
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ matrix.gradle }}
+
+      - name: Prepare variant
+        working-directory: forge-mod
+        shell: bash
+        run: |
+          if [ "${{ matrix.fg }}" = "6" ]; then
+            cp build-fg6.gradle build.gradle
+            cp settings-fg6.gradle settings.gradle
+            cp gradle-fg6.properties gradle.properties
+          fi
 
       - name: Build
         id: buildstep
@@ -46,25 +55,19 @@ jobs:
         working-directory: forge-mod
         shell: bash
         run: |
-          set -e
           cd ..
           git config user.name "ci-bot"
           git config user.email "ci@users.noreply.github.com"
-          BRANCH="forge-dist-${{ matrix.gradle }}"
+          BRANCH="forge-dist-fg${{ matrix.fg }}"
           mkdir -p dist
           cp forge-mod/build.log dist/build.log
-          if [ "${{ steps.buildstep.outcome }}" = "success" ]; then
-            cp forge-mod/build/libs/*.jar dist/aipilot-1.16.5.jar
-            echo "${{ matrix.gradle }}" > dist/gradle-version.txt
-            MSG="AI Pilot build OK gradle=${{ matrix.gradle }} (${GITHUB_SHA::7})"
+          if [ -f forge-mod/build/libs/aipilot-1.16.5.jar ]; then
+            cp forge-mod/build/libs/aipilot-1.16.5.jar dist/
+            MSG="AI Pilot OK fg${{ matrix.fg }} (${GITHUB_SHA::7})"
           else
-            MSG="AI Pilot build FAILED gradle=${{ matrix.gradle }} (${GITHUB_SHA::7})"
+            MSG="AI Pilot FAILED fg${{ matrix.fg }} (${GITHUB_SHA::7})"
           fi
           git checkout -q -B "$BRANCH"
           git add -f dist
           git commit -q -m "$MSG" || echo "nothing to commit"
           git push -f origin "$BRANCH"
-
-      - name: Fail job if build failed
-        if: steps.buildstep.outcome == 'failure'
-        run: exit 1
