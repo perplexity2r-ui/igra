@@ -35,20 +35,20 @@ jobs:
           set -o pipefail
           gradle build --no-daemon --stacktrace -x test 2>&1 | tee build.log
 
-      - name: Publish log to issue on failure
+      - name: Publish log to ci-logs branch on failure
         if: steps.buildstep.outcome == 'failure'
         working-directory: forge-mod
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 - <<'PY'
-          import json, os, subprocess
-          log = open('build.log', errors='replace').read()
-          tail = log[-40000:]
-          body = "Automatic build failure log for `" + os.environ.get("GITHUB_SHA","")[:12] + "`\n\n```\n" + tail + "\n```"
-          open('/tmp/body.json','w').write(json.dumps({"title":"[CI] forge-mod build failure "+os.environ.get("GITHUB_RUN_ID",""),"body":body}))
-          subprocess.run(["gh","api","repos/"+os.environ["GITHUB_REPOSITORY"]+"/issues","--input","/tmp/body.json"],check=False)
-          PY
+          cp build.log ../build-failure.log
+          cd ..
+          git config user.name "ci-bot"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout -q -B ci-logs || exit 0
+          git add -f build-failure.log
+          git commit -q -m "CI build failure ${GITHUB_RUN_ID}" || exit 0
+          git push -q -f origin ci-logs || exit 0
 
       - name: Fail job if build failed
         if: steps.buildstep.outcome == 'failure'
