@@ -18,9 +18,6 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.MovementInput;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.vector.Vector3d;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 
 import java.util.List;
@@ -206,7 +203,7 @@ public final class AiPilotEngine {
             if (d > searchRange) continue;
             // приоритет: игроки и мобы в поле зрения, ближайшие
             double score = d;
-            if (!p.hasLineOfSight(e)) score += 4.0;
+            if (!p.canSee(e)) score += 4.0;
             if (e instanceof PlayerEntity) score -= 1.5;
             if (score < bestScore) { bestScore = score; best = e; }
             if (eye.distanceToSqr(e.position()) < 0.0001) continue;
@@ -245,7 +242,7 @@ public final class AiPilotEngine {
 
     private static boolean shouldJump(ClientPlayerEntity p, LivingEntity t, double dist) {
         if (!autoCrit) return false;
-        if (!p.onGround()) return false;
+        if (!p.isOnGround()) return false;
         return dist < 3.4 && dist > 1.2 && p.getAttackStrengthScale(0.5F) < 0.6F;
     }
 
@@ -254,7 +251,7 @@ public final class AiPilotEngine {
         inForward = -1.0F;
         inStrafe = (p.tickCount % 10 < 5) ? 0.8F : -0.8F;
         inBack = true;
-        inJump = p.onGround() && p.tickCount % 8 == 0;
+        inJump = p.isOnGround() && p.tickCount % 8 == 0;
         inSprint = false;
         p.setSprinting(false);
         raiseShield(mc, p);
@@ -264,9 +261,9 @@ public final class AiPilotEngine {
         ItemStack main = p.getMainHandItem();
         ItemStack off = p.getOffhandItem();
         if (off.getItem() instanceof net.minecraft.item.ShieldItem) {
-            if (!p.isBlocking()) mc.gameMode.useItem(p, Hand.OFF_HAND);
+            if (!p.isBlocking()) mc.gameMode.useItem(p, p.level, Hand.OFF_HAND);
         } else if (main.getItem() instanceof net.minecraft.item.ShieldItem) {
-            if (!p.isBlocking()) mc.gameMode.useItem(p, Hand.MAIN_HAND);
+            if (!p.isBlocking()) mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
         }
     }
 
@@ -278,7 +275,7 @@ public final class AiPilotEngine {
         else p.setSprinting(true);
 
         float charge = p.getAttackStrengthScale(0.5F);
-        boolean crit = autoCrit && !p.onGround() && p.getDeltaMovement().y < 0.0 && !p.isSprinting();
+        boolean crit = autoCrit && !p.isOnGround() && p.getDeltaMovement().y < 0.0 && !p.isSprinting();
         if (charge >= style.attackThreshold || (crit && charge >= 0.5F)) {
             if (attackingCooldown <= 0) {
                 mc.gameMode.attack(p, t);
@@ -298,7 +295,7 @@ public final class AiPilotEngine {
     // ----------------------------------------------------------------- eat
     private static int findFoodSlot(ClientPlayerEntity p) {
         for (int i = 0; i < 9; i++) {
-            ItemStack s = p.getInventory().items.get(i);
+            ItemStack s = p.inventory.items.get(i);
             if (!s.isEmpty() && s.getItem().isEdible()) return i;
         }
         return -1;
@@ -306,10 +303,10 @@ public final class AiPilotEngine {
 
     private static void eat(Minecraft mc, ClientPlayerEntity p, int slot) {
         if (p.getHealth() >= p.getMaxHealth() * 0.92F) { eatSlot = -1; return; }
-        ItemStack s = p.getInventory().items.get(slot);
+        ItemStack s = p.inventory.items.get(slot);
         if (s.isEmpty() || !s.getItem().isEdible()) { eatSlot = -1; return; }
         select(p, slot);
-        if (!p.isUsingItem()) mc.gameMode.useItem(p, Hand.MAIN_HAND);
+        if (!p.isUsingItem()) mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
         inForward = -0.6F;
         inStrafe = 0.0F;
         inBack = true;
@@ -324,14 +321,14 @@ public final class AiPilotEngine {
         int best = -1;
         double bestDmg = -1.0;
         for (int i = 0; i < 9; i++) {
-            ItemStack s = p.getInventory().items.get(i);
+            ItemStack s = p.inventory.items.get(i);
             if (s.isEmpty()) continue;
             Item it = s.getItem();
             if (!(it instanceof SwordItem || it instanceof AxeItem || it instanceof TridentItem)) continue;
             double dmg = attackDamage(s);
             if (dmg > bestDmg) { bestDmg = dmg; best = i; }
         }
-        if (best >= 0 && best != p.getInventory().selected) select(p, best);
+        if (best >= 0 && best != p.inventory.selected) select(p, best);
     }
 
     private static double attackDamage(ItemStack stack) {
@@ -344,7 +341,7 @@ public final class AiPilotEngine {
     }
 
     private static void select(ClientPlayerEntity p, int slot) {
-        p.getInventory().selected = slot;   // клиент синхронизирует слот сам
+        p.inventory.selected = slot;   // клиент синхронизирует слот сам
     }
 
     private static void releaseKeys(Minecraft mc) {
@@ -381,30 +378,23 @@ public final class AiPilotEngine {
         Minecraft mc = Minecraft.getInstance();
         ClientPlayerEntity p = mc.player;
         if (p == null) return;
-        List<ITextComponent> lines = event.getLeft();
-        TextFormatting stateColor = AiPilot.isEnabled() ? TextFormatting.GREEN : TextFormatting.RED;
-        lines.add(new StringTextComponent("").append(
-                new StringTextComponent("AI Pilot ").withStyle(TextFormatting.AQUA))
-                .append(new StringTextComponent(AiPilot.isEnabled() ? "ON" : "OFF").withStyle(stateColor))
-                .append(new StringTextComponent("  [" + style.label + "]").withStyle(TextFormatting.GRAY)));
+        List<String> lines = event.getLeft();
+        lines.add("\u00A7bAI Pilot "
+                + (AiPilot.isEnabled() ? "\u00A7aON" : "\u00A7cOFF")
+                + "\u00A77  [" + style.label + "]");
 
         if (AiPilot.isEnabled() && target != null) {
             double d = p.distanceTo(target);
             String hp = String.format(Locale.ROOT, "%.1f", target.getHealth());
-            lines.add(new StringTextComponent(
-                    "  target: " + target.getName().getString() + "  " + hp + " HP  "
-                            + String.format(Locale.ROOT, "%.1f", d) + "m")
-                    .withStyle(TextFormatting.YELLOW));
+            lines.add("\u00A7e  target: " + target.getName().getString() + "  " + hp + " HP  "
+                    + String.format(Locale.ROOT, "%.1f", d) + "m");
             int charge = Math.round(p.getAttackStrengthScale(0.5F) * 100.0F);
-            lines.add(new StringTextComponent("  charge: " + charge + "%")
-                    .withStyle(charge > 95 ? TextFormatting.GREEN : TextFormatting.GRAY));
+            lines.add((charge > 95 ? "\u00A7a" : "\u00A77") + "  charge: " + charge + "%");
             if (escapeTicks > 0) {
-                lines.add(new StringTextComponent("  \u21B3 escape combo (backpedal + shield)")
-                        .withStyle(TextFormatting.LIGHT_PURPLE));
+                lines.add("\u00A7d  \u21B3 escape combo (backpedal + shield)");
             }
         } else if (AiPilot.isEnabled()) {
-            lines.add(new StringTextComponent("  no target in " + (int) searchRange + "m")
-                    .withStyle(TextFormatting.DARK_GRAY));
+            lines.add("\u00A78  no target in " + (int) searchRange + "m");
         }
     }
 }
