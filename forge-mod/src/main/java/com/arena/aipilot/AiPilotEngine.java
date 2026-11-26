@@ -225,7 +225,8 @@ public final class AiPilotEngine {
                 + countPotionsWithEffect(p, Effects.MOVEMENT_SPEED);
         int ranged = countInventoryItem(p, Items.SNOWBALL) + countInventoryItem(p, Items.EGG)
                 + countInventoryItem(p, Items.ARROW) + countInventoryItem(p, Items.TIPPED_ARROW)
-                + countInventoryItem(p, Items.SPECTRAL_ARROW) + countInventoryItem(p, Items.CROSSBOW);
+                + countInventoryItem(p, Items.SPECTRAL_ARROW) + countInventoryItem(p, Items.CROSSBOW)
+                + countSplashPotions(p, Effects.HARM);
         lastObservation[18] = clip((buffs + ranged) / 12.0F, 0.0F, 1.0F);
         lastObservation[19] = isShieldBlocking(p) ? 1.0F : 0.0F;
         lastObservation[20] = isShieldBlocking(t) ? 1.0F : 0.0F;
@@ -475,7 +476,7 @@ public final class AiPilotEngine {
                 placeTrap(mc, p, t);
                 break;
             case 20:
-                useWaterBucket(mc, p);
+                useWaterBucket(mc, p, t);
                 break;
             case 21:
                 placePillarBlock(mc, p);
@@ -767,6 +768,18 @@ public final class AiPilotEngine {
         }
         if (dist >= 1.9 && dist <= 4.2) {
             useBucketAt(mc, p, Items.LAVA_BUCKET, t.blockPosition());
+        }
+    }
+
+    private static void useWaterBucket(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+        double dist = horizontalDistance(p, t);
+        boolean hazard = p.isOnFire()
+                || mc.level.getBlockState(p.blockPosition()).getBlock() == Blocks.LAVA
+                || mc.level.getBlockState(p.blockPosition()).getBlock() == Blocks.COBWEB;
+        if (dist <= 3.4) {
+            useBucketAt(mc, p, Items.WATER_BUCKET, targetAdjacentBlock(mc, p, t));
+        } else if (hazard) {
+            useBucketAt(mc, p, Items.WATER_BUCKET, p.blockPosition());
         }
     }
 

@@ -50,7 +50,7 @@ measurements/estimates:
 | 15 | golden apples `/ 5` | golden and enchanted golden apples in inventory |
 | 16 | instant-heal potions `/ 5` | splash potions carrying `HEAL` |
 | 17 | pearls `/ 4` | ender pearls in inventory |
-| 18 | `(buffs + ranged) / 12` | speed/strength potions plus arrows, snowballs, eggs, and crossbows |
+| 18 | `(buffs + ranged) / 12` | speed/strength potions plus arrows, snowballs, eggs, harming splash potions, and crossbows |
 | 19 | learner shield up | local player actively blocking with a shield |
 | 20 | enemy shield up | target actively blocking with a shield |
 | 21 | generic blocks `/ 24` | block items, excluding obsidian, cobweb, and respawn anchor |
@@ -93,7 +93,7 @@ server commands or custom arena protocol:
 | 14 | instant heal | use a hotbar splash potion with `HEAL` |
 | 15 | ender pearl | throw an ender pearl |
 | 16 | buff potion | drink a strength or speed potion |
-| 17 | ranged | throw harming potion, snowball, or egg (when present) |
+| 17 | ranged | throw harming potion, snowball, or egg; charge/release a bow or crossbow when present |
 | 18 | barricade | place a generic block between player and target |
 | 19 | cobweb/lava trap | place a cobweb, otherwise pour a lava bucket near target |
 | 20 | water bucket | pour water at the player's feet |
