@@ -12,7 +12,7 @@ The opponent is a **professional scripted pro player** (skill-scaled): it kites 
 distance, shield-times, axe-breaks shields, cages against blasts, drinks, traps, pearls in
 and executes full explosive combos — not a random walker anymore.
 
-Observation `Box(30,)`, action `Discrete(28)`. Same protocol as `bot/bot.js`.
+Observation `Box(34,)`, action `Discrete(30)`. The action/observation order is shared with `bot/bot.js`.
 """
 from __future__ import annotations
 
