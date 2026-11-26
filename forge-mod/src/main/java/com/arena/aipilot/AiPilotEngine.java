@@ -724,7 +724,7 @@ public final class AiPilotEngine {
             Vector3d hit = new Vector3d(support.getX() + 0.5 + face.getStepX() * 0.5,
                     support.getY() + 0.5 + face.getStepY() * 0.5,
                     support.getZ() + 0.5 + face.getStepZ() * 0.5);
-            mc.gameMode.useItemOn(p, p.level, Hand.MAIN_HAND,
+            mc.gameMode.useItemOn(p, mc.level, Hand.MAIN_HAND,
                     new BlockRayTraceResult(hit, face, support, false));
             return true;
         }
@@ -735,7 +735,7 @@ public final class AiPilotEngine {
         Vector3d hit = new Vector3d(block.getX() + 0.5 + face.getStepX() * 0.5,
                 block.getY() + 0.5 + face.getStepY() * 0.5,
                 block.getZ() + 0.5 + face.getStepZ() * 0.5);
-        mc.gameMode.useItemOn(p, p.level, Hand.MAIN_HAND,
+        mc.gameMode.useItemOn(p, mc.level, Hand.MAIN_HAND,
                 new BlockRayTraceResult(hit, face, block, false));
     }
 
