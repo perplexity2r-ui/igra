@@ -829,7 +829,8 @@ const SPECTATOR_HTML = `<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
-<title>Live Minecraft 1.16.5 PvP Server — 8-Cam 360° Arena</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AI PvP — живой бой финальной модели</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0b0e16; color: #e8f0ff; font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
@@ -847,28 +848,53 @@ const SPECTATOR_HTML = `<!DOCTYPE html>
   .card h3 { font-size: 14px; margin-bottom: 6px; }
   .bar { height: 12px; background: #252e42; border-radius: 4px; overflow: hidden; margin-top: 6px; }
   .bar > div { height: 100%; transition: width 0.12s linear; }
-  .events { font-family: ui-monospace, monospace; font-size: 12px; color: #cbd5e1; line-height: 1.45; max-height: 115px; overflow: hidden; }
+  .events { font-family: ui-monospace, monospace; font-size: 12px; color: #cbd5e1; line-height: 1.45; max-height: 115px; overflow: auto; }
+  .mobile-camera { display: none; }
+  @media (max-width: 680px) {
+    header { align-items: flex-start; gap: 8px; padding: 10px 12px; }
+    header h1 { font-size: 16px; line-height: 1.25; }
+    header .badge { flex: 0 0 auto; font-size: 10px; padding: 5px 8px; }
+    .mobile-camera { display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; }
+    .mobile-camera label { color: #94a3b8; font-size: 12px; }
+    .mobile-camera select { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; color: #e8f0ff; background: #121829; border: 1px solid #2a395c; font: inherit; }
+    .grid { display: block; padding: 8px 12px; }
+    .cam-box { display: none; width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; }
+    .cam-box.mobile-active { display: block; }
+    .cam-label { font-size: 11px; }
+    .hud { grid-template-columns: 1fr; gap: 8px; padding: 0 12px 12px; }
+    .card { padding: 10px 12px; font-size: 12px; }
+    .card h3 { font-size: 13px; }
+    .events { max-height: 150px; }
+  }
+  @media (max-width: 360px) {
+    header { flex-direction: column; }
+    header .badge { align-self: flex-start; }
+  }
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>⚔️ LIVE MINECRAFT 1.16.5 PvP SERVER — 360° MULTI-CAM SPECTATOR</h1>
-    <div style="font-size:12px;color:#94a3b8;">Ряд 1: 4 камеры 360° на LearnerBot (PPO 50k) &nbsp;|&nbsp; Ряд 2: 4 камеры 360° на EnemyBot (Асимметричный рандом + блоки)</div>
+    <h1>⚔️ Живой бой: финальная PPO против PRO</h1>
+    <div style="font-size:12px;color:#94a3b8;">PPO COMBO FINAL vs PRO-противник · Minecraft 1.16.5 · 8 камер 360°</div>
   </div>
-  <div id="statusBadge" class="badge">LIVE SERVER :25565</div>
+  <div id="statusBadge" class="badge">ПОДКЛЮЧЕНИЕ…</div>
 </header>
 
+<div class="mobile-camera">
+  <label for="mobileCamSelect">Камера</label>
+  <select id="mobileCamSelect" aria-label="Выбрать камеру"></select>
+</div>
 <div class="grid" id="camGrid"></div>
 
 <div class="hud">
   <div class="card">
-    <h3 style="color:#38bdf8;">🟦 LearnerBot (PPO 50k Neural Policy)</h3>
+    <h3 style="color:#38bdf8;">🟦 LearnerBot · PPO COMBO FINAL</h3>
     <div id="lMeta">Ожидание подключения бота...</div>
     <div class="bar"><div id="lBar" style="width:100%;background:#38bdf8;"></div></div>
   </div>
   <div class="card">
-    <h3 style="color:#f87171;">🟥 EnemyBot (Asymmetric Chaos Bot)</h3>
+    <h3 style="color:#f87171;">🟥 EnemyBot · PRO-противник</h3>
     <div id="eMeta">Ожидание подключения бота...</div>
     <div class="bar"><div id="eBar" style="width:100%;background:#f87171;"></div></div>
   </div>
@@ -890,13 +916,24 @@ const CAMS = [
   { bot: 'EnemyBot', base: 270, title: 'E-CAM 4 [LEFT + 360°]', cls: 'enemy' },
 ];
 const grid = document.getElementById('camGrid');
+const mobileCamSelect = document.getElementById('mobileCamSelect');
 const ctxs = CAMS.map((c, idx) => {
   const box = document.createElement('div');
   box.className = 'cam-box ' + c.cls;
   box.innerHTML = '<div class="cam-label"><span>' + c.title + '</span><span id="az'+idx+'">000°</span></div><canvas width="420" height="288"></canvas>';
   grid.appendChild(box);
-  return { ...c, idx, canvas: box.querySelector('canvas'), ctx: box.querySelector('canvas').getContext('2d'), azEl: box.querySelector('#az'+idx) };
+  const option = document.createElement('option');
+  option.value = String(idx);
+  option.textContent = c.bot + ' — ' + c.title.replace(/^.*?\[/, '').replace(/\]$/, '');
+  mobileCamSelect.appendChild(option);
+  return { ...c, idx, box, canvas: box.querySelector('canvas'), ctx: box.querySelector('canvas').getContext('2d'), azEl: box.querySelector('#az'+idx) };
 });
+
+function activateMobileCam(index) {
+  ctxs.forEach((c, i) => c.box.classList.toggle('mobile-active', i === Number(index)));
+}
+mobileCamSelect.addEventListener('change', () => activateMobileCam(mobileCamSelect.value));
+activateMobileCam(0);
 
 let state = { bots: [], blocks: [], events: [] };
 function connectWS() {
@@ -910,6 +947,10 @@ connectWS();
 function updateHUD() {
   const L = state.bots.find(b => b.username === 'LearnerBot');
   const E = state.bots.find(b => b.username === 'EnemyBot');
+  const badge = document.getElementById('statusBadge');
+  const bothConnected = Boolean(L && E);
+  badge.textContent = bothConnected ? '● БОЙ ИДЁТ' : 'ОЖИДАНИЕ БОТОВ';
+  badge.style.background = bothConnected ? '#16a34a' : '#b45309';
   if (L) {
     document.getElementById('lMeta').textContent = 'Оружие: ' + L.weapon + ' | Броня: ' + L.armorPoints + ' ед. | HP: ' + L.hp.toFixed(1) + '/20 (+' + L.absorption.toFixed(1) + ')' + (L.shieldUp ? ' [ЩИТ]' : '') + (L.onFire ? ' [ГОРИТ]' : '');
     document.getElementById('lBar').style.width = Math.max(0, Math.min(100, L.hp * 5)) + '%';
@@ -1017,9 +1058,14 @@ function renderCam(c, orbitDeg) {
   }
 }
 
+const mobileViewport = window.matchMedia('(max-width: 680px)');
 function animate(ts) {
   const orbitDeg = ((ts || 0) * 0.032) % 360;
-  for (const c of ctxs) renderCam(c, orbitDeg);
+  if (mobileViewport.matches) {
+    renderCam(ctxs[Number(mobileCamSelect.value) || 0], orbitDeg);
+  } else {
+    for (const c of ctxs) renderCam(c, orbitDeg);
+  }
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
