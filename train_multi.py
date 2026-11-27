@@ -15,6 +15,14 @@ from env.multi_opponent import MAX_OPPONENTS, MIN_OPPONENTS, MultiOpponentVecEnv
 from train_pro import warm_start
 
 
+def difficulty_schedule(progress: float, max_difficulty: bool = False) -> tuple[float, float, float]:
+    """Return enemy skill, aggression, and combo curriculum for this training point."""
+    progress = float(np.clip(progress, 0.0, 1.0))
+    if max_difficulty:
+        return 1.0, 1.0, 0.20
+    return 0.30 + 0.70 * progress, 0.55 + 0.45 * progress, 0.20 * progress
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fights", type=int, default=50_000,
@@ -37,6 +45,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--save", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_next_50k")
     parser.add_argument("--log-every-fights", type=int, default=5_000)
     parser.add_argument("--time-budget", type=float, default=0.0)
+    parser.add_argument(
+        "--max-difficulty", action="store_true",
+        help="train at full enemy skill/aggression and combo curriculum from fight one",
+    )
     return parser.parse_args()
 
 
@@ -104,7 +116,8 @@ def main() -> None:
         f"MULTI PvP training: target={args.fights:,} fights | {args.n_envs} arenas | "
         f"opponents={args.min_opponents}..{args.max_opponents} | "
         f"player aggression={args.player_aggression:.0%} | terrain={args.terrain_mix:.0%} | "
-        f"exact={args.exact_fights} | warm start={args.load}",
+        f"exact={args.exact_fights} | max-difficulty={args.max_difficulty} | "
+        f"warm start={args.load}",
         flush=True,
     )
 
@@ -114,13 +127,13 @@ def main() -> None:
             print(f"Time budget reached at {env.episodes:,} fights", flush=True)
             break
         progress = min(1.0, env.episodes / max(1.0, args.fights * 0.85))
-        skill = 0.30 + 0.70 * progress
+        skill, enemy_aggression, combo_curriculum = difficulty_schedule(
+            progress, max_difficulty=args.max_difficulty
+        )
         opponent_progress = min(1.0, env.episodes / max(1.0, args.fights * 0.25))
         current_cap = args.min_opponents + int(
             math.floor((args.max_opponents - args.min_opponents) * opponent_progress + 0.5)
         )
-        enemy_aggression = 0.55 + 0.45 * progress
-        combo_curriculum = 0.20 * progress
         env.set_enemy_skill(skill)
         env.set_aggression(enemy_aggression)
         env.set_combo_curriculum(combo_curriculum)
@@ -154,6 +167,12 @@ def main() -> None:
             )
             status = {
                 "target_fights": args.fights,
+                "seed": args.seed,
+                "warm_start": args.load,
+                "max_difficulty": args.max_difficulty,
+                "learning_rate": args.lr,
+                "entropy_coefficient": args.ent_coef,
+                "opponent_cap_ramp_fraction": 0.25,
                 "fights": env.episodes,
                 "wins": env.wins,
                 "losses": env.losses,
@@ -205,6 +224,12 @@ def main() -> None:
     recent_wr = sum(result == "W" for result in env.last_results) / recent_n
     summary = {
         "target_fights": args.fights,
+        "seed": args.seed,
+        "warm_start": args.load,
+        "max_difficulty": args.max_difficulty,
+        "learning_rate": args.lr,
+        "entropy_coefficient": args.ent_coef,
+        "opponent_cap_ramp_fraction": 0.25,
         "fights": env.episodes,
         "wins": env.wins,
         "losses": env.losses,

@@ -30,8 +30,11 @@ a separate 10,000-fight AoE diagnostic. At skill 1.0, the independent 200-fight
 checks won 58/200 against three opponents, 30/200 against four, 22/200 against five,
 12/200 against six, 4/200 against seven, and 1/200 against eight. This is not stable
 winning. Hard-crowd sampling, target-focus, and win/death reward-shaping refinements
-each ran another exact 50,000 fights but did not improve the benchmark. The full
-iteration table is in [`multi_opponent_iterations.md`](multi_opponent_iterations.md).
+each ran another exact 50,000 fights but did not produce stable wins. A further
+weighted-group 50,000-fight run won 59/200 against three opponents, 38/200 against
+four, 16/200 against five, 4/200 against six, 4/200 against seven, and 0/200 against
+eight. The full iteration table is in
+[`multi_opponent_iterations.md`](multi_opponent_iterations.md).
 
 ## Forge export and runtime
 
