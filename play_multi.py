@@ -11,7 +11,7 @@ from env.multi_opponent import MAX_OPPONENTS, MIN_OPPONENTS, MULTI_OBS_DIM, Mult
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_50k.zip")
+    parser.add_argument("--model", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_50k.zip")
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--n-envs", type=int, default=64)
     parser.add_argument("--min-opponents", type=int, default=MIN_OPPONENTS)

@@ -37,6 +37,8 @@ MIN_OPPONENTS = 3
 MAX_OPPONENTS = 8
 CROWD_FEATURES = 4
 MULTI_OBS_DIM = TERRAIN_OBS_DIM + CROWD_FEATURES
+DEATH_SHAPING_PENALTY = 400.0
+FULL_CROWD_WIN_BONUS = 400.0
 
 _WEAPON_DAMAGE = np.asarray([weapon.damage for weapon in MELEE_POOL], dtype=np.float32)
 _WEAPON_UPGRADE = np.arange(len(MELEE_POOL), dtype=np.int32)
@@ -194,20 +196,13 @@ class MultiOpponentArena:
         e.minecarts[rows] = np.where(r.random((k, m)) < 0.46,
                                      r.integers(1, 5, (k, m)), 0).astype(np.float32)
 
-        # Improve only a fraction of the learner's rolled gear by one adjacent tier,
-        # plus one extra healing/escape resource on some fights.
+        # Give the learner a small, consistent edge: one adjacent weapon tier when
+        # available and one armor tier, capped at the best tier. Extra consumables
+        # remain probabilistic so the loadout advantage does not become overwhelming.
         learner = self.core.L
         old_weapon = learner.weapon[rows].copy()
-        upgrade_weapon = r.random(k) < 0.45
-        learner.weapon[rows] = np.where(
-            upgrade_weapon,
-            _WEAPON_UPGRADE[old_weapon],
-            old_weapon,
-        )
-        learner.armor[rows] = np.minimum(
-            4,
-            learner.armor[rows] + (r.random(k) < 0.40).astype(np.int32),
-        )
+        learner.weapon[rows] = _WEAPON_UPGRADE[old_weapon]
+        learner.armor[rows] = np.minimum(4, learner.armor[rows] + 1)
         learner.gaps[rows] = np.minimum(
             4.0, learner.gaps[rows] + (r.random(k) < 0.45).astype(np.float32)
         )
@@ -235,7 +230,13 @@ class MultiOpponentArena:
         if rows.size == 0:
             return self._obs()
 
-        counts = self.rng.integers(self.min_opponents, self.opponent_cap + 1, rows.size)
+        group_sizes = np.arange(self.min_opponents, self.opponent_cap + 1, dtype=np.int32)
+        # Once the curriculum opens larger crowds, deliberately oversample them;
+        # uniform sampling left the eight-opponent case underrepresented.
+        weights = np.arange(1, group_sizes.size + 1, dtype=np.float64)
+        counts = self.rng.choice(
+            group_sizes, size=rows.size, p=weights / weights.sum()
+        ).astype(np.int32)
         self.enemy_count[rows] = counts
         self.alive[rows] = np.arange(MAX_OPPONENTS)[None, :] < counts[:, None]
 
@@ -287,8 +288,12 @@ class MultiOpponentArena:
             return
         delta = self.enemies.pos[rows] - self.core.L.pos[rows, None, :]
         distance = np.linalg.norm(delta, axis=2)
-        distance = np.where(self.alive[rows], distance, np.inf)
-        self.active_slot[rows] = np.argmin(distance, axis=1)
+        # After a kill, focus a weakened nearby foe instead of always starting a
+        # fresh full-health duel. The distance term still prevents chasing far targets.
+        effective_health = self.enemies.hp[rows] + self.enemies.abs[rows]
+        score = distance + 0.15 * effective_health
+        score = np.where(self.alive[rows], score, np.inf)
+        self.active_slot[rows] = np.argmin(score, axis=1)
         self._copy_slot_to_core(rows)
 
     def _move_other_opponents(self) -> tuple[np.ndarray, np.ndarray]:
@@ -456,6 +461,7 @@ class MultiOpponentArena:
         old_enemy_count = self.alive.sum(axis=1).astype(np.int32)
         other_blocked, other_pits = self._move_other_opponents()
         self._copy_slot_to_core(np.flatnonzero(self.alive.any(axis=1)))
+        learner_alive_before = self.core.L.hp > DEATH
         obs, reward, _, _, _, info = self.core.step(actions)
         self._copy_core_to_slot(np.flatnonzero(self.alive.any(axis=1)))
 
@@ -468,10 +474,17 @@ class MultiOpponentArena:
         extra_damage, extra_totem, extra_attacked = self._extra_attacks()
         was_dead = info["learner_dead"].copy()
         learner_dead = self.core.L.hp <= DEATH
+        has_opponents = self.alive.any(axis=1)
+        enemy_dead = ~has_opponents
+        final_crowd_kill = enemy_dead & (old_enemy_count > 0)
         reward = reward.copy()
         damage_penalty = 1.4 - 0.25 * self.player_aggression
         reward += aoe_damage * 2.5 + aoe_totem_pops * 8.0 + aoe_kills * 100.0
+        reward += final_crowd_kill.astype(np.float32) * FULL_CROWD_WIN_BONUS
         reward -= extra_damage * damage_penalty
+        reward -= (learner_alive_before & learner_dead).astype(np.float32) * DEATH_SHAPING_PENALTY
+        # The core already prices an in-step death; this adds the matching base penalty
+        # when the final blow came from a non-selected opponent after the core step.
         reward -= ((learner_dead & ~was_dead).astype(np.float32) * 100.0)
         reward -= extra_totem.astype(np.float32) * 2.0
 
@@ -480,10 +493,8 @@ class MultiOpponentArena:
         self.extra_terrain_blocked += other_blocked.astype(np.int32)
         self.extra_pit_blocked += other_pits.astype(np.int32)
 
-        has_opponents = self.alive.any(axis=1)
         target_lost = has_opponents & ~self.alive[rows, self.active_slot]
         self._retarget(target_lost)
-        enemy_dead = ~has_opponents
         timeout = self.core.step_count >= MAX_STEPS
         terminated = (learner_dead | enemy_dead) & ~timeout
         truncated = timeout & ~terminated

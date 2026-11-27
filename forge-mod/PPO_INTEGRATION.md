@@ -2,8 +2,9 @@
 
 ## Model and runtime
 
-The current Forge build embeds the deterministic 48-feature actor fine-tuned for
-one-versus-many fights from `models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_50k.zip`.
+The current Forge build embeds the best-tested deterministic 48-feature actor
+fine-tuned for one-versus-many fights from
+`models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_50k.zip`.
 It retains the terrain actor's 44 inputs and appends four crowd-context sensors; the
 architecture is `48 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`.
 `PpoPolicy` reads `src/main/resources/com/arena/aipilot/ppo_policy.bin` and selects
@@ -79,9 +80,10 @@ counterpart for some simulator-only state, so the bridge uses the following meas
 | 46 | mean opponent distance `/ 20` | mean horizontal distance of the nearest eight valid targets |
 | 47 | mean opponent health `/ 20` | mean health plus absorption of those targets |
 
-The engine also runs a short safe-direction search when the forward probe is blocked,
-adds forward pressure outside melee range, and only retreats automatically below the
-configured low-health threshold.
+On target acquisition, the engine slightly favors weakened nearby targets after
+accounting for distance and visibility. It also runs a short safe-direction search
+when the forward probe is blocked, adds forward pressure outside melee range, and only
+retreats automatically below the configured low-health threshold.
 
 Inventory counts include the full player inventory, while actions can only select
 hotbar items; the target's private inventory may not be synchronized by every server.
@@ -103,32 +105,43 @@ Press **Esc** to close the panel. Existing keys remain **O** (auto-combat) and *
 
 ## Multi-opponent fine-tuning
 
-`train_multi.py` warm-starts the 48-feature actor from the aggressive terrain model.
-Every fight has at least three simultaneously active opponents; the curriculum ramps
-up to eight. The learner gets a small gear/resource edge on average, the opponents
-use skill-scaled kits, and player aggression remains at `1.0`. Exact quotas
-freeze each vector row after its allocated number of completed fights.
+`train_multi.py` uses completed fights (not simulation steps) for its exact quota.
+Every fight has at least three simultaneous opponents and the curriculum reaches
+eight. Larger groups are oversampled once available. The learner receives one
+adjacent weapon tier and one armor tier when available, plus occasional extra
+consumables; player aggression is `1.0`. The simulator applies explosive splash to
+nearby opponents, focuses weakened nearby targets after a kill, and gives a stronger
+terminal penalty for the learner's death than for ordinary damage.
 
 ```bash
 .venv/bin/python train_multi.py \\
   --fights 50000 --exact-fights --n-envs 128 \\
   --min-opponents 3 --max-opponents 8 --player-aggression 1.0 \\
-  --load models/terrain_finetune/pvp_ppo_terrain_aggressive_50k.zip \\
-  --save models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_50k
+  --load models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_10k.zip \\
+  --save models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_50k
 .venv/bin/python forge-mod/tools/export_ppo_weights.py
 .venv/bin/python forge-mod/tools/verify_ppo_weights.py
-.venv/bin/python play_multi.py --episodes 100 --opponent-cap 8
+.venv/bin/python play_multi.py --episodes 200 --min-opponents 3 --opponent-cap 8
 ```
 
-The completed 50,000-fight run recorded **5,918 wins, 43,976 losses, and 106 draws**.
-At max opponent skill, the initial deterministic 100-fight checks returned 6W/94L
-against three opponents and 0W/100L against eight. This does not meet the no-loss
-goal. A later simulator fix added collateral explosive damage to other opponents;
-a separate 10,000-fight diagnostic model improved the three-opponent check to 38W/160L/2D
-in 200 fights, but still managed only 1W/199L against eight. That diagnostic is not
-counted as part of the exact 50,000-fight run. See the training summary JSON for
-histograms and the repeat 200-fight checks of the original model.
+The corrected 50,000-fight run recorded **8,395 wins, 41,447 losses, and 158 draws**.
+For the best-tested checkpoint, deterministic evaluation at skill 1.0 used 200 fights
+per group:
 
+| Opponents | Wins | Losses | Draws | Win rate |
+|---:|---:|---:|---:|---:|
+| 3 | 62 | 136 | 2 | 31.0% |
+| 4 | 29 | 170 | 1 | 14.5% |
+| 5 | 28 | 172 | 0 | 14.0% |
+| 6 | 5 | 193 | 2 | 2.5% |
+| 7 | 4 | 196 | 0 | 2.0% |
+| 8 | 3 | 197 | 0 | 1.5% |
+
+This is not stable winning and does not meet the no-loss goal. Three additional exact
+50,000-fight refinements (hard-crowd sampling, target focus, and win/death reward
+shaping) did not improve the best checkpoint enough to change that conclusion. The
+Forge runtime still has not been validated in a live Minecraft group fight; the
+Python arena and packaged-actor checks are not an in-game multiplayer test.
 ## Action compatibility
 
 The policy still chooses an integer in `Discrete(30)`; Java maps that ID to the

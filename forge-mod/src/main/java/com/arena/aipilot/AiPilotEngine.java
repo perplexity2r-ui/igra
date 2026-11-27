@@ -1187,7 +1187,8 @@ public final class AiPilotEngine {
             double d = p.distanceTo(e);
             if (d > searchRange) continue;
             // приоритет: игроки и мобы в поле зрения, ближайшие
-            double score = d;
+            double score = horizontalDistance(p, e)
+                    + 0.15 * (e.getHealth() + e.getAbsorptionAmount());
             if (!p.canSee(e)) score += 4.0;
             if (e instanceof PlayerEntity) score -= 1.5;
             if (score < bestScore) { bestScore = score; best = e; }

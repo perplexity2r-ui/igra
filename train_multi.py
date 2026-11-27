@@ -33,8 +33,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--player-aggression", type=float, default=1.0)
     parser.add_argument("--min-opponents", type=int, default=MIN_OPPONENTS)
     parser.add_argument("--max-opponents", type=int, default=MAX_OPPONENTS)
-    parser.add_argument("--load", default="models/terrain_finetune/pvp_ppo_terrain_aggressive_50k.zip")
-    parser.add_argument("--save", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_50k")
+    parser.add_argument("--load", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_50k.zip")
+    parser.add_argument("--save", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_next_50k")
     parser.add_argument("--log-every-fights", type=int, default=5_000)
     parser.add_argument("--time-budget", type=float, default=0.0)
     return parser.parse_args()
@@ -115,7 +115,7 @@ def main() -> None:
             break
         progress = min(1.0, env.episodes / max(1.0, args.fights * 0.85))
         skill = 0.30 + 0.70 * progress
-        opponent_progress = min(1.0, env.episodes / max(1.0, args.fights * 0.65))
+        opponent_progress = min(1.0, env.episodes / max(1.0, args.fights * 0.25))
         current_cap = args.min_opponents + int(
             math.floor((args.max_opponents - args.min_opponents) * opponent_progress + 0.5)
         )
