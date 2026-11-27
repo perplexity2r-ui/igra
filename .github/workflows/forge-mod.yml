@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -64,6 +64,27 @@ jobs:
             echo "Collected $JAR"
           else
             echo "Build did not produce a distributable JAR (outcome: ${{ steps.buildstep.outcome }})"
+          fi
+
+      - name: Publish primary JAR on the source branch
+        if: matrix.fg == '5' && steps.buildstep.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="$(find forge-mod/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*sources.jar' -print -quit)"
+          if [ -z "$JAR" ]; then
+            echo "::error::ForgeGradle 5 build produced no mod JAR"
+            exit 1
+          fi
+          cp "$JAR" mods/pvp/aipilot-1.16.5.jar
+          git config user.name "ci-bot"
+          git config user.email "ci@users.noreply.github.com"
+          git add mods/pvp/aipilot-1.16.5.jar
+          if git diff --cached --quiet; then
+            echo "The release JAR is already current"
+          else
+            git commit -m "build: publish Forge 1.16.5 mod from CI"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
       - name: Upload build log and JAR
