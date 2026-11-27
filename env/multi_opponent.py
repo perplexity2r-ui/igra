@@ -1,6 +1,6 @@
 """Vectorized one-versus-many PvP fine-tuning environment.
 
-The legacy terrain actor's 44 observations are kept in place and six crowd/threat
+The legacy terrain actor's 44 observations are kept in place and eight crowd/threat
 features are appended. Fights contain 3..8 simultaneously active opponents; the
 nearest active opponent is the current PPO target while the remaining fighters
 close in and attack the shared player state.
@@ -35,7 +35,7 @@ from .pro_vec_env import (
 
 MIN_OPPONENTS = 3
 MAX_OPPONENTS = 8
-CROWD_FEATURES = 6
+CROWD_FEATURES = 8
 MULTI_OBS_DIM = TERRAIN_OBS_DIM + CROWD_FEATURES
 DEATH_SHAPING_PENALTY = 400.0
 FULL_CROWD_WIN_BONUS = 400.0
@@ -445,9 +445,17 @@ class MultiOpponentArena:
         nearest_other_slot = np.argmin(np.where(other_mask, distance, np.inf), axis=1)
         rows = np.arange(self.n)
         nearest_other_delta = self.enemies.pos[rows, nearest_other_slot] - self.core.L.pos
-        nearest_other_delta = np.where(
-            other_mask.any(axis=1)[:, None], nearest_other_delta, 0.0
+        has_other = other_mask.any(axis=1)
+        nearest_other_delta = np.where(has_other[:, None], nearest_other_delta, 0.0)
+        other_delta = self.enemies.pos - self.core.L.pos[:, None, :]
+        other_direction = other_delta / np.maximum(distance, 1e-6)[:, :, None]
+        direction_weight = np.where(other_mask, 1.0 / (1.0 + distance), 0.0)
+        weight_sum = direction_weight.sum(axis=1, keepdims=True)
+        mean_other_direction = (
+            (other_direction * direction_weight[:, :, None]).sum(axis=1)
+            / np.maximum(weight_sum, 1e-6)
         )
+        mean_other_direction = np.where(has_other[:, None], mean_other_direction, 0.0)
         crowd = np.stack([
             np.clip(self.alive.sum(axis=1) / MAX_OPPONENTS, 0.0, 1.0),
             np.clip(close_count / MAX_OPPONENTS, 0.0, 1.0),
@@ -455,6 +463,8 @@ class MultiOpponentArena:
             np.clip(mean_health / 20.0, 0.0, 1.5),
             np.clip(nearest_other_delta[:, 0] / 20.0, -1.0, 1.0),
             np.clip(nearest_other_delta[:, 1] / 20.0, -1.0, 1.0),
+            np.clip(mean_other_direction[:, 0], -1.0, 1.0),
+            np.clip(mean_other_direction[:, 1], -1.0, 1.0),
         ], axis=1).astype(np.float32)
         return np.concatenate([base, crowd], axis=1).astype(np.float32)
 

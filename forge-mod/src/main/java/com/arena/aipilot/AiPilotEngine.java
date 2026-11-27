@@ -46,7 +46,7 @@ public final class AiPilotEngine {
     private static double searchRange = 17.0;
     private static LivingEntity target;
     private static final PpoPolicy ppoPolicy = new PpoPolicy();
-    private static final float[] lastObservation = new float[50];
+    private static final float[] lastObservation = new float[52];
     private static final int[] actionCooldownUntilTick = new int[30];
     private static final double[] terrainSampleDistances = {0.75, 1.5, 2.25, 3.0};
     private static TerrainScan cachedTerrainScan;
@@ -300,15 +300,27 @@ public final class AiPilotEngine {
         double nearestOtherDistance = Double.MAX_VALUE;
         double nearestOtherDx = 0.0;
         double nearestOtherDz = 0.0;
+        double pressureXSum = 0.0;
+        double pressureZSum = 0.0;
+        double pressureWeightSum = 0.0;
         for (LivingEntity enemy : nearby) {
             double distance = horizontalDistance(p, enemy);
             if (distance <= 3.25) close++;
             distanceSum += distance;
             healthSum += enemy.getHealth() + enemy.getAbsorptionAmount();
-            if (enemy != target && distance < nearestOtherDistance) {
-                nearestOtherDistance = distance;
-                nearestOtherDx = enemy.getX() - p.getX();
-                nearestOtherDz = enemy.getZ() - p.getZ();
+            if (enemy != target) {
+                double dx = enemy.getX() - p.getX();
+                double dz = enemy.getZ() - p.getZ();
+                double weight = 1.0 / (1.0 + distance);
+                double safeDistance = Math.max(distance, 1.0e-6);
+                pressureXSum += dx / safeDistance * weight;
+                pressureZSum += dz / safeDistance * weight;
+                pressureWeightSum += weight;
+                if (distance < nearestOtherDistance) {
+                    nearestOtherDistance = distance;
+                    nearestOtherDx = dx;
+                    nearestOtherDz = dz;
+                }
             }
         }
         int count = nearby.size();
@@ -320,6 +332,10 @@ public final class AiPilotEngine {
                 : clip((float) (healthSum / count / 20.0), 0.0F, 1.5F);
         lastObservation[48] = clip((float) (nearestOtherDx / 20.0), -1.0F, 1.0F);
         lastObservation[49] = clip((float) (nearestOtherDz / 20.0), -1.0F, 1.0F);
+        lastObservation[50] = pressureWeightSum == 0.0 ? 0.0F
+                : clip((float) (pressureXSum / pressureWeightSum), -1.0F, 1.0F);
+        lastObservation[51] = pressureWeightSum == 0.0 ? 0.0F
+                : clip((float) (pressureZSum / pressureWeightSum), -1.0F, 1.0F);
     }
 
     private static final class TerrainScan {

@@ -41,8 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--player-aggression", type=float, default=1.0)
     parser.add_argument("--min-opponents", type=int, default=MIN_OPPONENTS)
     parser.add_argument("--max-opponents", type=int, default=MAX_OPPONENTS)
-    parser.add_argument("--load", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_threat_seed.zip")
-    parser.add_argument("--save", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_threat_50k")
+    parser.add_argument("--load", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_seed.zip")
+    parser.add_argument("--save", default="models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_50k")
     parser.add_argument("--log-every-fights", type=int, default=5_000)
     parser.add_argument("--time-budget", type=float, default=0.0)
     parser.add_argument(

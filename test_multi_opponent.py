@@ -16,7 +16,7 @@ def test_multi_arena_has_three_to_eight_live_opponents_and_crowd_features():
     counts = arena.alive.sum(axis=1)
 
     assert obs.shape == (48, MULTI_OBS_DIM)
-    assert MULTI_OBS_DIM == 50
+    assert MULTI_OBS_DIM == 52
     assert np.all(counts >= MIN_OPPONENTS)
     assert np.all(counts <= MAX_OPPONENTS)
     np.testing.assert_allclose(obs[:, 44], counts / MAX_OPPONENTS)
@@ -36,6 +36,13 @@ def test_observation_includes_nearest_non_target_opponent_offset():
     obs = arena._obs()[0]
 
     np.testing.assert_allclose(obs[48:50], np.array([-0.1, 0.05], dtype=np.float32))
+    other_delta = np.array([[-2.0, 1.0], [0.0, 4.0]], dtype=np.float32)
+    other_distance = np.linalg.norm(other_delta, axis=1)
+    weights = 1.0 / (1.0 + other_distance)
+    expected_direction = np.sum(
+        other_delta / other_distance[:, None] * weights[:, None], axis=0
+    ) / weights.sum()
+    np.testing.assert_allclose(obs[50:52], expected_direction, rtol=1e-6, atol=1e-6)
 
 
 def test_retarget_prefers_a_wounded_opponent_within_nearby_range():
