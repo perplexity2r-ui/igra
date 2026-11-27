@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -51,33 +51,33 @@ jobs:
           set -o pipefail
           gradle build --no-daemon -x test 2>&1 | tee build.log
 
-      - name: Publish result branch
+      - name: Collect build output
+        if: always()
         working-directory: forge-mod
         shell: bash
         run: |
-          cd ..
-          git config user.name "ci-bot"
-          git config user.email "ci@users.noreply.github.com"
-          BRANCH="forge-dist-fg${{ matrix.fg }}"
-          mkdir -p dist
-          cp forge-mod/build.log dist/build.log
-          JAR="$(find forge-mod/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*sources.jar' -print -quit 2>/dev/null || true)"
+          mkdir -p ci-dist
+          if [ -f build.log ]; then cp build.log ci-dist/build.log; fi
+          JAR="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*sources.jar' -print -quit 2>/dev/null || true)"
           if [ "${{ steps.buildstep.outcome }}" = "success" ] && [ -n "$JAR" ]; then
-            cp "$JAR" dist/aipilot-1.16.5.jar
-            echo "Published mod from $JAR"
-            MSG="AI Pilot OK fg${{ matrix.fg }} (${GITHUB_SHA::7})"
+            cp "$JAR" ci-dist/aipilot-1.16.5.jar
+            echo "Collected $JAR"
           else
-            echo "No successful mod jar found (build outcome: ${{ steps.buildstep.outcome }})"
-            MSG="AI Pilot FAILED fg${{ matrix.fg }} (${GITHUB_SHA::7})"
+            echo "Build did not produce a distributable JAR (outcome: ${{ steps.buildstep.outcome }})"
           fi
-          git checkout -q -B "$BRANCH"
-          git add -f dist
-          git commit -q -m "$MSG" || echo "nothing to commit"
-          git push -f origin "$BRANCH"
+
+      - name: Upload build log and JAR
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aipilot-1.16.5-forgegradle-${{ matrix.fg }}
+          path: forge-mod/ci-dist/*
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Fail the workflow if the build failed
         if: steps.buildstep.outcome != 'success'
         shell: bash
         run: |
-          echo "::error::Forge build failed. The full log is on forge-dist-fg${{ matrix.fg }}:dist/build.log"
+          echo "::error::Forge build failed. Download the build log artifact for ForgeGradle ${{ matrix.fg }}."
           exit 1

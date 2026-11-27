@@ -4,7 +4,9 @@
 
 - Minecraft Java **1.16.5**, Forge **36.2.39**.
 - Copy the JAR into the `mods` folder of the Forge profile you launch.
-- Press **O** to toggle AI combat; **J** toggles the HUD.
-- The client mod uses the currently logged-in Minecraft session and ordinary client actions. It does not ask for account credentials or log in separately.
+- In the updated source, press **O** to toggle AI combat, **J** to toggle the HUD, and **K** to open combat-style sliders for aggression, pursuit, strafing, and caution. Slider values save to `config/aipilot-style.properties`.
+- The client mod uses the currently logged-in Minecraft session and ordinary client actions; it does not ask for account credentials or log in separately.
 
-The PPO actor is embedded in the JAR. The source and model integration notes are in [`../../forge-mod/`](../../forge-mod/) and [`../../forge-mod/PPO_INTEGRATION.md`](../../forge-mod/PPO_INTEGRATION.md). Use automation only in worlds/servers where it is permitted; public servers may prohibit bots or use anti-cheat.
+**Build status:** the checked-in JAR is still the previous build. The Forge sources now expect the terrain-aware 44-feature actor and include the new navigation and style controls; rebuild with the Minecraft 1.16.5 / Forge 36.2.39 toolchain before installing these source changes.
+
+The PPO actor is embedded in the JAR. Source and integration notes are in [`../../forge-mod/`](../../forge-mod/) and [`../../forge-mod/PPO_INTEGRATION.md`](../../forge-mod/PPO_INTEGRATION.md). Use automation only where permitted; public servers may prohibit bots or use anti-cheat.

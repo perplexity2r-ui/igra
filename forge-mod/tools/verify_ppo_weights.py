@@ -10,13 +10,14 @@ import numpy as np
 import torch
 from stable_baselines3 import PPO
 
-OBS, H1, H2, ACTIONS = 34, 192, 192, 30
+OBS, H1, H2, ACTIONS = 44, 192, 192, 30
 
 
 def main() -> None:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", type=Path, default=root / "models/pvp_ppo_combo_final.zip")
+    parser.add_argument("--model", type=Path,
+                        default=root / "models/terrain_finetune/pvp_ppo_terrain_10k.zip")
     parser.add_argument(
         "--weights",
         type=Path,
