@@ -46,8 +46,12 @@ public final class AiPilotEngine {
     private static double searchRange = 17.0;
     private static LivingEntity target;
     private static final PpoPolicy ppoPolicy = new PpoPolicy();
-    private static final float[] lastObservation = new float[34];
+    private static final float[] lastObservation = new float[44];
     private static final int[] actionCooldownUntilTick = new int[30];
+    private static final double[] terrainSampleDistances = {0.75, 1.5, 2.25, 3.0};
+    private static TerrainScan cachedTerrainScan;
+    private static int cachedTerrainTick = Integer.MIN_VALUE;
+    private static int cachedTerrainTargetId = -1;
     private static int lastAction = -1;
     private static int modelStepCount = 0;
     private static int observedTargetId = -1;
@@ -101,6 +105,9 @@ public final class AiPilotEngine {
         placedCrystalBase = null;
         shieldActionActive = false;
         lastPolicyTick = Integer.MIN_VALUE;
+        cachedTerrainScan = null;
+        cachedTerrainTick = Integer.MIN_VALUE;
+        cachedTerrainTargetId = -1;
         inForward = 0.0F;
         inStrafe = 0.0F;
         inJump = false;
@@ -169,6 +176,7 @@ public final class AiPilotEngine {
             modelStepCount = Math.min(600, modelStepCount + 1);
             applyPolicyAction(mc, p, target, lastAction);
         }
+        applyNavigationAssist(mc, p, target);
     }
 
     private static void resetEpisodeState() {
@@ -189,6 +197,9 @@ public final class AiPilotEngine {
         placedCrystalBase = null;
         lastAction = -1;
         lastPolicyTick = Integer.MIN_VALUE;
+        cachedTerrainScan = null;
+        cachedTerrainTick = Integer.MIN_VALUE;
+        cachedTerrainTargetId = -1;
         Arrays.fill(lastObservation, 0.0F);
     }
 
@@ -252,6 +263,116 @@ public final class AiPilotEngine {
         lastObservation[32] = clip(enemyComboTaken / 5.0F, 0.0F, 1.0F);
         lastObservation[33] = playerComboTaken == 0 ? 0.0F
                 : clip(p.hurtTime * 0.05F, 0.0F, 1.0F);
+        TerrainScan terrain = getTerrainScan(mc, p, t);
+        for (int i = 0; i < 4; i++) {
+            lastObservation[34 + i] = terrain.clearance[i];
+            lastObservation[38 + i] = terrain.support[i];
+        }
+        lastObservation[42] = terrain.targetHeightDelta;
+        lastObservation[43] = terrain.forwardSlope;
+    }
+
+    private static final class TerrainScan {
+        final float[] clearance = new float[4];
+        final float[] support = new float[4];
+        final double[] directionX = new double[4];
+        final double[] directionZ = new double[4];
+        float targetHeightDelta;
+        float forwardSlope;
+    }
+
+    /** Probe the same four approach directions used by the terrain-trained actor. */
+    private static TerrainScan getTerrainScan(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+        if (cachedTerrainScan != null && cachedTerrainTick == p.tickCount
+                && cachedTerrainTargetId == t.getId()) return cachedTerrainScan;
+
+        TerrainScan scan = new TerrainScan();
+        double dx = t.getX() - p.getX();
+        double dz = t.getZ() - p.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        double forwardX;
+        double forwardZ;
+        if (distance > 1.0e-6) {
+            forwardX = dx / distance;
+            forwardZ = dz / distance;
+        } else {
+            double yaw = Math.toRadians(p.yRot);
+            forwardX = -Math.sin(yaw);
+            forwardZ = Math.cos(yaw);
+        }
+        double rightX = -forwardZ;
+        double rightZ = forwardX;
+        scan.directionX[0] = forwardX;
+        scan.directionZ[0] = forwardZ;
+        scan.directionX[1] = -rightX;
+        scan.directionZ[1] = -rightZ;
+        scan.directionX[2] = rightX;
+        scan.directionZ[2] = rightZ;
+        scan.directionX[3] = -forwardX;
+        scan.directionZ[3] = -forwardZ;
+
+        for (int direction = 0; direction < 4; direction++) {
+            float clearance = 1.0F;
+            for (double probe : terrainSampleDistances) {
+                double x = p.getX() + scan.directionX[direction] * probe;
+                double z = p.getZ() + scan.directionZ[direction] * probe;
+                if (blocksMovementAt(mc, x, p.getY(), z)
+                        || !hasGroundSupport(mc, x, z, p.getY())) {
+                    clearance = (float) (probe / 4.0);
+                    break;
+                }
+            }
+            scan.clearance[direction] = clearance;
+            double supportX = p.getX() + scan.directionX[direction] * 1.5;
+            double supportZ = p.getZ() + scan.directionZ[direction] * 1.5;
+            scan.support[direction] = hasGroundSupport(mc, supportX, supportZ, p.getY()) ? 1.0F : 0.0F;
+        }
+
+        scan.targetHeightDelta = clip((float) ((t.getY() - p.getY()) / 3.0), -1.0F, 1.0F);
+        double playerGround = groundHeight(mc, p.getX(), p.getZ(), p.getY());
+        double aheadGround = groundHeight(mc, p.getX() + forwardX * 1.5,
+                p.getZ() + forwardZ * 1.5, p.getY());
+        if (Double.isFinite(playerGround) && Double.isFinite(aheadGround)) {
+            scan.forwardSlope = clip((float) ((aheadGround - playerGround) / 2.0), -1.0F, 1.0F);
+        }
+        cachedTerrainScan = scan;
+        cachedTerrainTick = p.tickCount;
+        cachedTerrainTargetId = t.getId();
+        return scan;
+    }
+
+    private static double groundHeight(Minecraft mc, double x, double z, double feetY) {
+        if (mc.level == null) return Double.NaN;
+        int blockX = (int) Math.floor(x);
+        int blockZ = (int) Math.floor(z);
+        int baseY = (int) Math.floor(feetY);
+        // Search downward from feet level; looking above it would confuse cave ceilings with ground.
+        int topY = baseY;
+        int bottomY = Math.max(0, baseY - 8);
+        for (int y = topY; y >= bottomY; y--) {
+            BlockPos pos = new BlockPos(blockX, y, blockZ);
+            if (mc.level.getBlockState(pos).getMaterial().blocksMotion()) return y + 1.0;
+        }
+        return Double.NaN;
+    }
+
+    private static boolean hasGroundSupport(Minecraft mc, double x, double z, double feetY) {
+        double ground = groundHeight(mc, x, z, feetY);
+        if (!Double.isFinite(ground)) return false;
+        double delta = feetY - ground;
+        // Permit a one-block step down/up, reject holes and steep drops.
+        return delta >= -1.05 && delta <= 1.35;
+    }
+
+    private static boolean blocksMovementAt(Minecraft mc, double x, double feetY, double z) {
+        if (mc.level == null) return true;
+        int blockX = (int) Math.floor(x);
+        int blockZ = (int) Math.floor(z);
+        int y = (int) Math.floor(feetY + 0.05);
+        BlockPos feet = new BlockPos(blockX, y, blockZ);
+        BlockPos head = new BlockPos(blockX, y + 1, blockZ);
+        return mc.level.getBlockState(feet).getMaterial().blocksMotion()
+                || mc.level.getBlockState(head).getMaterial().blocksMotion();
     }
 
     private static void updateComboState(ClientPlayerEntity p, LivingEntity t) {
@@ -565,6 +686,118 @@ public final class AiPilotEngine {
             if (!stack.isEmpty() && stack.getItem() == item) count += stack.getCount();
         }
         return count;
+    }
+
+    private static void applyNavigationAssist(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+        double distance = horizontalDistance(p, t);
+        TerrainScan scan = getTerrainScan(mc, p, t);
+        float aggression = AiPilotSettings.aggression();
+        float pursuit = AiPilotSettings.pursuit();
+        float strafing = AiPilotSettings.strafing();
+        float caution = AiPilotSettings.caution();
+
+        boolean blockedAhead = scan.clearance[0] < 0.99F || scan.support[0] < 0.5F;
+        double routeX = scan.directionX[0];
+        double routeZ = scan.directionZ[0];
+        if (blockedAhead && distance > 1.65 && pursuit > 0.01F) {
+            double[] route = chooseSafePursuitDirection(mc, p, scan);
+            routeX = route[0];
+            routeZ = route[1];
+            float strength = 0.45F + 0.55F * pursuit;
+            setMovementToward(p, routeX, routeZ, strength);
+            if (p.isOnGround() && scan.support[0] > 0.5F
+                    && isLowObstacleAhead(mc, p, scan.directionX[0], scan.directionZ[0])) {
+                inJump = true;
+            }
+        } else if (distance > 3.0 && pursuit > 0.01F) {
+            // The user-facing aggression slider is a bias against kiting: outside
+            // melee range the bot advances instead of settling into a retreat loop.
+            float chase = (0.18F + 0.72F * aggression) * pursuit;
+            inForward = Math.max(inForward, chase);
+            inSprint = aggression > 0.45F && distance > 5.0;
+        }
+
+        if (distance >= 1.45 && distance <= 4.0 && strafing > 0.01F) {
+            boolean leftSafe = scan.clearance[1] > 0.25F && scan.support[1] > 0.5F;
+            boolean rightSafe = scan.clearance[2] > 0.25F && scan.support[2] > 0.5F;
+            if (leftSafe || rightSafe) {
+                int phase = (((p.tickCount / 20) + t.getId()) & 1) == 0 ? 1 : -1;
+                if (leftSafe && !rightSafe) phase = 1;
+                if (rightSafe && !leftSafe) phase = -1;
+                inStrafe = clip(inStrafe + phase * strafing * 0.28F, -1.0F, 1.0F);
+            }
+        }
+
+        float maxHealth = Math.max(1.0F, p.getMaxHealth());
+        float healthRatio = (p.getHealth() + p.getAbsorptionAmount()) / maxHealth;
+        float retreatThreshold = 0.10F + 0.30F * caution;
+        if (caution > 0.01F && healthRatio < retreatThreshold && distance < 4.0) {
+            inForward = Math.min(inForward, -0.20F - 0.45F * caution);
+        }
+    }
+
+    private static double[] chooseSafePursuitDirection(
+            Minecraft mc, ClientPlayerEntity p, TerrainScan scan) {
+        double targetX = scan.directionX[0];
+        double targetZ = scan.directionZ[0];
+        double rightX = -targetZ;
+        double rightZ = targetX;
+        double[] angles = {0.0, -35.0, 35.0, -60.0, 60.0, -90.0, 90.0, 180.0};
+        double bestScore = -Double.MAX_VALUE;
+        double bestX = targetX;
+        double bestZ = targetZ;
+        for (double angle : angles) {
+            double radians = Math.toRadians(angle);
+            double dirX = targetX * Math.cos(radians) + rightX * Math.sin(radians);
+            double dirZ = targetZ * Math.cos(radians) + rightZ * Math.sin(radians);
+            double clearance = 1.0;
+            for (double probe : terrainSampleDistances) {
+                double x = p.getX() + dirX * probe;
+                double z = p.getZ() + dirZ * probe;
+                if (blocksMovementAt(mc, x, p.getY(), z)
+                        || !hasGroundSupport(mc, x, z, p.getY())) {
+                    clearance = probe / 4.0;
+                    break;
+                }
+            }
+            boolean supported = hasGroundSupport(mc, p.getX() + dirX * 1.5,
+                    p.getZ() + dirZ * 1.5, p.getY());
+            double progress = dirX * targetX + dirZ * targetZ;
+            double score = 0.55 * progress + 0.45 * clearance + (supported ? 0.25 : -1.5);
+            if (score > bestScore) {
+                bestScore = score;
+                bestX = dirX;
+                bestZ = dirZ;
+            }
+        }
+        return new double[]{bestX, bestZ};
+    }
+
+    private static void setMovementToward(ClientPlayerEntity p, double directionX,
+                                          double directionZ, float strength) {
+        double yaw = Math.toRadians(p.yRot);
+        double forwardX = -Math.sin(yaw);
+        double forwardZ = Math.cos(yaw);
+        double rightX = Math.cos(yaw);
+        double rightZ = Math.sin(yaw);
+        inForward = clip((float) ((directionX * forwardX + directionZ * forwardZ) * strength), -1.0F, 1.0F);
+        // MovementInput.leftImpulse is positive for left; the local right vector is opposite.
+        inStrafe = clip((float) (-(directionX * rightX + directionZ * rightZ) * strength), -1.0F, 1.0F);
+        inSprint = strength > 0.75F;
+    }
+
+    private static boolean isLowObstacleAhead(Minecraft mc, ClientPlayerEntity p,
+                                               double directionX, double directionZ) {
+        double x = p.getX() + directionX * 0.75;
+        double z = p.getZ() + directionZ * 0.75;
+        int blockX = (int) Math.floor(x);
+        int blockZ = (int) Math.floor(z);
+        int feetY = (int) Math.floor(p.getY() + 0.05);
+        boolean feetBlocked = mc.level.getBlockState(new BlockPos(blockX, feetY, blockZ))
+                .getMaterial().blocksMotion();
+        boolean headBlocked = mc.level.getBlockState(new BlockPos(blockX, feetY + 1, blockZ))
+                .getMaterial().blocksMotion();
+        return feetBlocked && !headBlocked;
     }
 
     private static void setMovementForAction(int action) {

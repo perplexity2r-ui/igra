@@ -2,9 +2,9 @@
 
 ## Model and runtime
 
-The Forge client embeds only the deterministic actor exported from
-`models/pvp_ppo_combo_final.zip`. Its architecture is
-`34 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`.
+The terrain-aware Forge build embeds the deterministic actor fine-tuned from
+`models/pvp_ppo_combo_final.zip` on 10,000 additional hard-terrain fights. Its
+architecture is `44 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`.
 `PpoPolicy` reads `src/main/resources/com/arena/aipilot/ppo_policy.bin` and selects
 `argmax(logits)` in Java. Python, PyTorch, Stable-Baselines3, and network access are
 not needed in the game. The client runs one inference every two Minecraft ticks
@@ -18,17 +18,17 @@ To regenerate and verify the embedded weights after updating the checkpoint:
 ```
 
 The verifier compares all 30 logits against Stable-Baselines3 on 512 seeded
-observations. The checked-in resource has SHA-256
-`2a0e01dfe0568efed0fa2668ce7986d872ecf75e3afc9a91ef1c9454e5be14d1`.
+observations. The terrain-aware resource has SHA-256
+`91b2c436f3a3ac14a3fbbcefd4fffaa61c4d718ead7fbcda9adfa3bbc7f9cc49`.
 If the resource is missing or has an incompatible header/size, the mod fails closed:
 AI combat is disabled; it does not fall back to the old heuristic.
 
 ## Observation compatibility
 
-The source contract is `env/pro_vec_env.py::_obs()` (`Box(-1, 2, (34,), float32)`).
-Indices and normalization are kept in the same order. Minecraft has no direct
-counterpart for some simulator-only state, so the bridge uses the following
-measurements/estimates:
+The legacy source contract is `env/pro_vec_env.py::_obs()` (`Box(-1, 2, (34,), float32)`).
+Terrain fine-tuning appends ten sensors without changing those first 34 indices, for
+`Box(44,)`. Minecraft has no direct counterpart for some simulator-only state, so the
+bridge uses the following measurements/estimates:
 
 | Index | Training feature | Forge input |
 |---:|---|---|
@@ -55,7 +55,7 @@ measurements/estimates:
 | 20 | enemy shield up | target actively blocking with a shield |
 | 21 | generic blocks `/ 24` | block items, excluding obsidian, cobweb, and respawn anchor |
 | 22 | cobweb + lava + water `/ 6` | corresponding inventory items |
-| 23 | obstacle count `/ 6` | `1/6` when the target is not visible, otherwise zero |
+| 23 | obstacle count `/ 6` | visibility-based `1/6` approximation; the new terrain sensors provide explicit local obstacles |
 | 24 | end crystals `/ 6` | end crystals in inventory |
 | 25 | anchors `/ 4` | respawn anchors in inventory |
 | 26 | TNT minecarts `/ 4` | TNT minecarts in inventory |
@@ -66,12 +66,52 @@ measurements/estimates:
 | 31 | learner stun `/ 1s` | estimated remaining 0.45-second combo stun |
 | 32 | enemy combo taken `/ 5` | target health/absorption losses near the local player |
 | 33 | hurt cooldown `/ .5`, only in combo | Minecraft `hurtTime * .05`, gated by the estimated combo counter |
+| 34 | forward clearance | nearest of four probes (0.75–3 blocks) that meets a wall, obstruction, or pit |
+| 35 | left clearance | same probe, left of the target-facing direction |
+| 36 | right clearance | same probe, right of the target-facing direction |
+| 37 | rear clearance | same probe, behind the player |
+| 38–41 | floor support, forward/left/right/back | solid-ground checks at 1.5 blocks; unsupported holes score zero |
+| 42 | target height delta `/ 3` | target feet height relative to the player's feet |
+| 43 | forward slope `/ 2` | sampled ground-height change 1.5 blocks ahead |
+
+The engine also runs a short safe-direction search when the forward probe is blocked,
+adds forward pressure outside melee range, and only retreats automatically below the
+configured low-health threshold.
 
 Inventory counts include the full player inventory, while actions can only select
 hotbar items; the target's private inventory may not be synchronized by every server.
 Armor tiers, simulator stun/combos, obstacle count, and the custom cage flag are
 therefore approximations rather than exact simulator state. This does not change the
 network's tensor shape or feature order.
+
+## Combat style controls
+
+Press **K** in-game to open draggable sliders; values persist to
+`config/aipilot-style.properties`.
+
+- **Aggression** biases movement toward the target and discourages passive kiting.
+- **Pursuit** controls how strongly the safe-route assist steers around terrain.
+- **Strafing** adjusts lateral movement in close-range exchanges.
+- **Caution** sets how readily the bot retreats at critically low health.
+
+Press **Esc** to close the panel. Existing keys remain **O** (auto-combat) and **J** (HUD).
+
+## Additional terrain fine-tuning
+
+The 10,000-fight continuation uses hard maps on every fight and warm-starts from the
+compatible 34-observation/30-action combo checkpoint (the ten new input weights are
+initialized by PPO). `--exact-fights` distributes a fixed completion quota across
+parallel arenas and freezes each row once its quota is met.
+
+```bash
+.venv/bin/python train_pro.py \\
+  --fights 10000 --exact-fights --n-envs 128 \\
+  --load models/pvp_ppo_combo_final.zip --terrain-mix 1.0 \\
+  --n-steps 256 --batch-size 4096 \\
+  --save models/terrain_finetune/pvp_ppo_terrain_10k
+.venv/bin/python forge-mod/tools/export_ppo_weights.py
+.venv/bin/python forge-mod/tools/verify_ppo_weights.py
+```
 
 ## Action compatibility
 

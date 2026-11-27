@@ -21,6 +21,7 @@ import org.lwjgl.glfw.GLFW;
  * Управление:
  *   O      — включить/выключить PPO-автобой
  *   J      — включить/выключить HUD
+ *   K      — открыть слайдеры стиля боя
  */
 @Mod(AiPilot.MOD_ID)
 @Mod.EventBusSubscriber(modid = AiPilot.MOD_ID, value = net.minecraftforge.api.distmarker.Dist.CLIENT,
@@ -35,6 +36,7 @@ public class AiPilot {
     private static boolean hudVisible = true;
     private static boolean lastO = false;
     private static boolean lastJ = false;
+    private static boolean lastK = false;
 
     public static boolean isEnabled() { return enabled; }
     public static boolean isHudVisible() { return hudVisible; }
@@ -64,14 +66,19 @@ public class AiPilot {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.START) return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.screen != null) { lastO = lastJ = false; return; }
+        if (mc.player == null || mc.screen != null) {
+            lastO = lastJ = lastK = false;
+            return;
+        }
 
         boolean o = GLFW.glfwGetKey(mc.getWindow().getWindow(), GLFW.GLFW_KEY_O) == GLFW.GLFW_PRESS;
         boolean j = GLFW.glfwGetKey(mc.getWindow().getWindow(), GLFW.GLFW_KEY_J) == GLFW.GLFW_PRESS;
+        boolean k = GLFW.glfwGetKey(mc.getWindow().getWindow(), GLFW.GLFW_KEY_K) == GLFW.GLFW_PRESS;
 
         if (o && !lastO) toggle();
         if (j && !lastJ) { hudVisible = !hudVisible; }
-        lastO = o; lastJ = j;
+        if (k && !lastK) mc.setScreen(new AiPilotScreen());
+        lastO = o; lastJ = j; lastK = k;
 
         if (enabled && !mc.isPaused()) {
             AiPilotEngine.tick(mc);

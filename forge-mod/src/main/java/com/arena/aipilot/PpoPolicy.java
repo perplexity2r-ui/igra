@@ -12,7 +12,7 @@ import java.nio.ByteOrder;
  */
 public final class PpoPolicy {
     private static final String RESOURCE = "/com/arena/aipilot/ppo_policy.bin";
-    private static final int OBS = 34;
+    private static final int OBS = 44;
     private static final int HIDDEN_1 = 192;
     private static final int HIDDEN_2 = 192;
     private static final int ACTIONS = 30;
@@ -59,7 +59,7 @@ public final class PpoPolicy {
             readFloats(data, w3);
             readFloats(data, b3);
             ready = true;
-            AiPilot.LOG.info("Loaded PPO COMBO FINAL actor: {} -> {} -> {} -> {}",
+            AiPilot.LOG.info("Loaded PPO terrain actor: {} -> {} -> {} -> {}",
                     OBS, HIDDEN_1, HIDDEN_2, ACTIONS);
         } catch (Exception e) {
             ready = false;

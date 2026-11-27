@@ -1,11 +1,13 @@
-"""Train the PRO PvP agent on 500 000 live-style fights (crystals, anchors, TNT carts, W-tap).
+"""Train or terrain-fine-tune the PRO PvP agent in the vectorized combat arena.
 
-Runs a fully-vectorised arena (`env/pro_vec_env.py`) with 1024 parallel fights, logs a
-full technique breakdown, ramps the professional opponent from "strong human" to
-"tournament pro", saves checkpoints and finally writes `models/pro_500k_*`.
+Can train the legacy 34-feature policy or a terrain-aware 44-feature policy with
+walls, floor holes, and hills. It logs techniques and ramps the opponent from a
+strong human to a tournament pro.
 
 Usage:
     .venv/bin/python train_pro.py --fights 500000 --n-envs 1024
+    .venv/bin/python train_pro.py --fights 10000 --exact-fights --n-envs 128 \\
+        --terrain-mix 1.0 --load models/pvp_ppo_combo_final.zip
 """
 from __future__ import annotations
 
@@ -59,7 +61,10 @@ class ProMetrics:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--fights", type=int, default=500_000)
+    p.add_argument("--fights", type=int, default=500_000,
+                   help="number of completed fights for this training run")
+    p.add_argument("--exact-fights", action="store_true",
+                   help="allocate exact per-arena fight quotas; idle arenas freeze at their quota")
     p.add_argument("--n-envs", type=int, default=1024)
     p.add_argument("--n-steps", type=int, default=256)
     p.add_argument("--batch-size", type=int, default=4096)
@@ -68,16 +73,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ent-coef", type=float, default=0.02)
     p.add_argument("--net", type=int, default=192)
     p.add_argument("--seed", type=int, default=2024)
+    p.add_argument("--terrain-mix", type=float, default=0.0,
+                    help="share (0..1) of fights using walls, pits, hills, or mixed terrain")
     p.add_argument("--save", default="models/pvp_ppo_pro_500k")
     p.add_argument("--load", default=None)
-    p.add_argument("--fresh", action="store_true", help="ignore warm-start from the 50k model")
+    p.add_argument("--fresh", action="store_true", help="train from random initialization")
     p.add_argument("--time-budget", type=float, default=0.0, help="optional wall-clock cap (s)")
     p.add_argument("--log-every-fights", type=int, default=2000)
     return p.parse_args()
 
 
 def warm_start(model: PPO, path: str) -> None:
-    """Copy overlapping weights from the older 24-obs / 22-action policy into 30/28."""
+    """Warm-start compatible overlapping layers (including legacy-to-terrain inputs)."""
     old = PPO.load(path, device="cpu")
     old_sd = old.policy.state_dict()
     new_sd = model.policy.state_dict()
@@ -125,7 +132,15 @@ def main() -> None:
     ckpt_dir = save_path.parent / "pro_checkpoints"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-    env = ProPvPVecEnv(args.n_envs, seed=args.seed)
+    if args.fights <= 0:
+        raise SystemExit("--fights must be positive")
+    if not 0.0 <= args.terrain_mix <= 1.0:
+        raise SystemExit("--terrain-mix must be between 0 and 1")
+    terrain_obs = args.terrain_mix > 0.0
+    env = ProPvPVecEnv(args.n_envs, seed=args.seed,
+                       terrain_mix=args.terrain_mix, terrain_obs=terrain_obs)
+    if args.exact_fights:
+        env.set_fight_limit(args.fights)
     env.set_enemy_skill(0.30)
     env.reset()
 
@@ -155,6 +170,7 @@ def main() -> None:
 
     print(
         f"PRO training: target {fight_target:,} fights | {args.n_envs} parallel arenas | "
+        f"terrain share={args.terrain_mix:.0%} | exact={args.exact_fights} | "
         f"{steps_per_rollout} steps/rollout | checkpoint -> {ckpt_dir}",
         flush=True,
     )
@@ -203,6 +219,9 @@ def main() -> None:
                 "wins": metrics.wins, "losses": metrics.losses, "draws": metrics.draws,
                 "win_rate_recent_200": round(metrics.win_rate, 4),
                 "enemy_skill": round(skill, 3),
+                "terrain_mix": args.terrain_mix,
+                "terrain_blocked_steps": env.terrain_blocked,
+                "pit_blocked_steps": env.pit_blocked,
                 "timesteps": total_timesteps,
                 "elapsed_sec": round(el, 1),
                 "fights_per_sec": round(metrics.fights / max(el, 1e-6), 1),
@@ -232,6 +251,9 @@ def main() -> None:
         "fights": metrics.fights,
         "wins": metrics.wins, "losses": metrics.losses, "draws": metrics.draws,
         "win_rate_recent_200": round(metrics.win_rate, 4),
+        "terrain_mix": args.terrain_mix,
+        "terrain_blocked_steps": env.terrain_blocked,
+        "pit_blocked_steps": env.pit_blocked,
         "timesteps": total_timesteps,
         "elapsed_sec": round(time.time() - start, 1),
         "combos": dict(metrics.combo),

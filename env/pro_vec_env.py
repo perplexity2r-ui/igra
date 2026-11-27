@@ -12,19 +12,22 @@ The opponent is a **professional scripted pro player** (skill-scaled): it kites 
 distance, shield-times, axe-breaks shields, cages against blasts, drinks, traps, pearls in
 and executes full explosive combos — not a random walker anymore.
 
-Observation `Box(34,)`, action `Discrete(30)`. The action/observation order is shared with `bot/bot.js`.
+The legacy observation is `Box(34,)`; terrain-aware fine-tuning adds ten sensors (`Box(44,)`). Actions remain `Discrete(30)`, and the original 34-feature order is unchanged.
 """
 from __future__ import annotations
 
+import copy
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import VecEnv
 
 from .sim_env import ARMOR_TIERS, BLOCK_TYPES, MELEE_POOL, RANGED_TYPES
+from .combat_terrain import CombatTerrain, TERRAIN_SENSOR_COUNT
 
 N_ACTIONS = 30
 OBS_DIM = 34
+TERRAIN_OBS_DIM = OBS_DIM + TERRAIN_SENSOR_COUNT
 DT = 0.10
 WALK = 4.317
 SPRINT = 5.612
@@ -185,9 +188,15 @@ class BotArrays:
 class ProArena:
     """Vectorised PRO PvP arena. `n` independent fights simulated in lock-step."""
 
-    def __init__(self, n: int = 1, seed: int | None = None, difficulty: float = 1.0):
+    def __init__(
+        self, n: int = 1, seed: int | None = None, difficulty: float = 1.0,
+        terrain_mix: float = 0.0, terrain_obs: bool = False,
+    ):
         self.n = int(n)
         self.rng = np.random.default_rng(seed)
+        self.terrain_mix = float(np.clip(terrain_mix, 0.0, 1.0))
+        self.terrain_obs = bool(terrain_obs)
+        self.terrain = CombatTerrain(self.n, self.rng, ARENA_BOUND)
         self.difficulty = np.full(self.n, float(difficulty), np.float32)
         # training wheels for the *opponent*: ramp from beatable to full pro
         self.e_skill = np.full(self.n, float(difficulty), np.float32)
@@ -349,6 +358,7 @@ class ProArena:
                 norm = np.maximum(np.linalg.norm(offset, axis=1, keepdims=True), 1e-6)
                 self.E.pos[hit] = np.clip(self.L.pos[hit] + offset / norm * 2.1,
                                           -ARENA_BOUND, ARENA_BOUND)
+        self.terrain.reset(mask, self.L.pos, self.E.pos, self.terrain_mix)
         return self._obs()
 
     def set_combo_curriculum(self, share: float) -> None:
@@ -372,8 +382,10 @@ class ProArena:
         self.e_skill[:] = float(value)
 
     def set_enemy_skill(self, value: float) -> None:
-        self._skill = float(value)
-        self.difficulty[:] = float(value)
+        skill = float(np.clip(value, 0.0, 1.0))
+        self._skill = skill
+        self.difficulty[:] = skill
+        self.e_skill[:] = skill
 
     # ---------------------------------------------------------------- helpers
     def _speed_mult(self, B: BotArrays) -> np.ndarray:
@@ -432,6 +444,22 @@ class ProArena:
         target.vel += (hit_dir / norm) * 5.5
         return d_tgt, d_self, dmg_t, dmg_c, dmg_c.sum()
 
+    def set_terrain_mix(self, value: float) -> None:
+        """Share (0..1) of new fights that use a randomized non-flat terrain."""
+        self.terrain_mix = float(np.clip(value, 0.0, 1.0))
+
+    def _move_with_terrain(
+        self, old_pos: np.ndarray, proposed_pos: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        old = np.asarray(old_pos, dtype=np.float32).reshape(self.n, 2)
+        candidate = self._push_out(np.clip(proposed_pos, -ARENA_BOUND, ARENA_BOUND))
+        delta = candidate - old
+        distance = np.linalg.norm(delta, axis=1)
+        climb = np.maximum(self.terrain.height(candidate) - self.terrain.height(old), 0.0)
+        uphill_scale = np.clip(1.0 - 0.35 * climb / np.maximum(distance, 0.1), 0.55, 1.0)
+        candidate = old + delta * uphill_scale[:, None]
+        return self.terrain.resolve_move(old, candidate)
+
     def _obstacle_between(self, p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
         seg = p2 - p1
         seg_len = np.maximum(np.linalg.norm(seg, axis=1, keepdims=True), 1e-6)
@@ -442,6 +470,7 @@ class ProArena:
             t = np.clip(((ob - p1) * seg).sum(1, keepdims=True) / (seg_len ** 2), 0.0, 1.0)
             proj = p1 + seg * t
             res |= live & (np.linalg.norm(ob - proj, axis=1) <= 1.25)
+        res |= self.terrain.blocks_line(p1, p2)
         return res
 
     def _add_obstacle(self, mid: np.ndarray, ttl: float = 12.0) -> None:
@@ -510,6 +539,11 @@ class ProArena:
             np.clip(E.combo_taken / 5.0, 0, 1),
             np.clip((L.hurt_cd / 0.5) * (L.combo_taken > 0), 0, 1),
         ], axis=1).astype(np.float32)
+        if self.terrain_obs:
+            terrain = self.terrain.sensor_features(
+                L.pos, E.pos, self.obstacles, self.obstacle_ttl
+            )
+            obs = np.concatenate([obs, terrain], axis=1).astype(np.float32)
         return obs
 
     # ---------------------------------------------------------------- enemy brain
@@ -684,6 +718,19 @@ class ProArena:
         E.shield_up = raise_shield
         e_move = np.where(raise_shield[:, None], -fwd * 0.4, e_move)
 
+        # The scripted sparring partner also routes around hard terrain; otherwise
+        # the student would learn to exploit an opponent that blindly walks at walls.
+        if np.any(self.terrain.kind > 0):
+            route_sensors = self.terrain.sensor_features(
+                E.pos, L.pos, self.obstacles, self.obstacle_ttl
+            )
+            route_needed = ((route_sensors[:, 0] < 0.45) | (route_sensors[:, 4] < 0.5)) & (dist > 1.7)
+            left_score = route_sensors[:, 1] + route_sensors[:, 5]
+            right_score = route_sensors[:, 2] + route_sensors[:, 6]
+            turn = np.where(left_score >= right_score, -1.0, 1.0)
+            routed_move = fwd * 0.35 + right * turn[:, None] * 0.9
+            e_move = np.where(route_needed[:, None], routed_move, e_move)
+
         # jump-crit attempts
         jump = ((E.y <= 1e-4) & (E.web <= 0) & (dist < 4.2) & (r.random(self.n) < 0.10)
                 & (~E.cage_until.astype(bool)))
@@ -694,8 +741,9 @@ class ProArena:
         re_dist = np.linalg.norm(E.pos - L.pos, axis=1)
         hit_p = 0.55 + 0.30 * diff + 0.45 * self.e_aggression
         reach = REACH + 0.45 * self.e_aggression
-        want_hit = ((~E.shield_up) & (re_dist <= reach) & (E.cd <= 0.0)
-                    & (r.random(self.n) < np.minimum(hit_p, 1.0))
+        vertical_delta = self.terrain.height(L.pos) - self.terrain.height(E.pos) + L.y - E.y
+        want_hit = ((~E.shield_up) & (re_dist <= reach) & (np.abs(vertical_delta) <= 2.2)
+                    & (E.cd <= 0.0) & (r.random(self.n) < np.minimum(hit_p, 1.0))
                     & (E.stun <= 0.0))
         if want_hit.any():
             blocked = L.has_shield & L.shield_up & (L.shield_disabled <= 0)
@@ -744,11 +792,14 @@ class ProArena:
                                          else (prev_broke | can_escape))
 
         E.vel = E.vel * 0.45 + e_move * speed[:, None] * 0.55
-        E.pos = self._push_out(np.clip(E.pos + E.vel * DT, -ARENA_BOUND, ARENA_BOUND))
+        old_pos = E.pos.copy()
+        E.pos, terrain_blocked, pit_blocked = self._move_with_terrain(old_pos, old_pos + E.vel * DT)
+        E.vel = np.where(terrain_blocked[:, None], E.vel * 0.15, E.vel)
         return {
             "move": e_move, "dist": dist, "fwd": fwd, "acted": acted,
             "dmg_dealt": dmg_dealt, "dmg_taken": dmg_taken, "healed": healed,
             "got_comboed": info.get("got_comboed"),
+            "terrain_blocked": terrain_blocked, "pit_blocked": pit_blocked,
         }
 
     # ---------------------------------------------------------------- main step
@@ -1051,7 +1102,9 @@ class ProArena:
         hit_dir = (L.pos - E.pos) / np.maximum(re_dist, 1e-6)[:, None]
         cover = self._obstacle_between(E.pos, L.pos)
         eff_reach = REACH + np.where(E.pillar > 0, 0.30, 0.0)
+        vertical_delta = self.terrain.height(L.pos) - self.terrain.height(E.pos) + L.y - E.y
         swing = (want_attack & (E.use_lock <= 0.0) & (E.cd <= 0.04) & (re_dist <= eff_reach)
+                 & (np.abs(vertical_delta) <= 2.2)
                  & ((~cover) | (E.pillar > 0)) & (E.stun <= 0.0))
         l_shield = L.has_shield & L.shield_up & (L.shield_disabled <= 0)
         break_shield = swing & l_shield & self._axe_of(E)
@@ -1083,12 +1136,15 @@ class ProArena:
 
         # ---- apply human movement (mirrors _enemy_brain's tail)
         E.vel = E.vel * 0.45 + move * speed[:, None] * 0.55
-        E.pos = self._push_out(np.clip(E.pos + E.vel * DT, -ARENA_BOUND, ARENA_BOUND))
+        old_pos = E.pos.copy()
+        E.pos, terrain_blocked, pit_blocked = self._move_with_terrain(old_pos, old_pos + E.vel * DT)
+        E.vel = np.where(terrain_blocked[:, None], E.vel * 0.15, E.vel)
 
         return {
             "move": move, "dist": np.linalg.norm(L.pos - E.pos, axis=1), "fwd": fwd,
             "acted": np.zeros(n, bool), "dmg_dealt": dmg_dealt,
             "dmg_taken": dmg_taken, "healed": healed, "tech": tech, "waste": waste,
+            "terrain_blocked": terrain_blocked, "pit_blocked": pit_blocked,
         }
 
     def _axe_of(self, B) -> np.ndarray:
@@ -1125,6 +1181,9 @@ class ProArena:
             "enemy_combo_broken": np.zeros(n, bool),
             "got_comboed": np.zeros(n, bool),
             "self_blast": np.zeros(n, bool),
+            "terrain_blocked": np.zeros(n, bool),
+            "pit_blocked": np.zeros(n, bool),
+            "enemy_terrain_blocked": np.zeros(n, bool),
             "totem_popped_learner": np.zeros(n, bool),
             "totem_popped_enemy": np.zeros(n, bool),
         }
@@ -1479,7 +1538,13 @@ class ProArena:
 
         # ---- player horizontal movement
         L.vel = L.vel * 0.45 + move * speed[:, None] * 0.55
-        L.pos = self._push_out(np.clip(L.pos + L.vel * DT, -ARENA_BOUND, ARENA_BOUND))
+        old_learner_pos = L.pos.copy()
+        L.pos, terrain_blocked, pit_blocked = self._move_with_terrain(
+            old_learner_pos, old_learner_pos + L.vel * DT
+        )
+        L.vel = np.where(terrain_blocked[:, None], L.vel * 0.15, L.vel)
+        flags["terrain_blocked"] |= terrain_blocked
+        flags["pit_blocked"] |= pit_blocked
 
         # ---- enemy decides & moves
         if self.pve and self._human_action is not None:
@@ -1488,6 +1553,7 @@ class ProArena:
         else:
             brain = self._enemy_brain(act, dmg_dealt, dmg_taken, healed, None)
         dmg_dealt, dmg_taken, healed = brain["dmg_dealt"], brain["dmg_taken"], brain["healed"]
+        flags["enemy_terrain_blocked"] |= brain.get("terrain_blocked", np.zeros(n, bool))
 
         # ---- obstacles & timers
         self.obstacle_ttl = np.maximum(0.0, self.obstacle_ttl - DT)
@@ -1541,7 +1607,9 @@ class ProArena:
         hit_dir = (E.pos - L.pos) / np.maximum(re_dist, 1e-6)[:, None]
         cover = self._obstacle_between(L.pos, E.pos)
         eff_reach = REACH + np.where(L.pillar > 0, 0.30, 0.0)
+        vertical_delta = self.terrain.height(E.pos) - self.terrain.height(L.pos) + E.y - L.y
         swing = (want_attack & (L.use_lock <= 0.0) & (L.cd <= 0.04) & (re_dist <= eff_reach)
+                 & (np.abs(vertical_delta) <= 2.2)
                  & ((~cover) | (L.pillar > 0)) & (L.stun <= 0.0))
         e_shield = E.has_shield & E.shield_up & (E.shield_disabled <= 0)
         break_shield = swing & e_shield & L.is_axe()
@@ -1602,6 +1670,8 @@ class ProArena:
         reward += np.where(flags["wtap_combo"], 2.0, 0.0)
         reward += np.where(flags["totem_popped_enemy"], 8.0, 0.0)
         reward -= np.where(flags["self_blast"], 3.0, 0.0)
+        reward -= np.where(flags["terrain_blocked"], 0.35, 0.0)
+        reward -= np.where(flags["pit_blocked"], 0.85, 0.0)
         reward -= np.where(waste, 1.5, 0.0)
         # --- combo play ---
         reward += np.where(flags["combo_hit"], 1.2, 0.0)
@@ -1633,6 +1703,10 @@ class ProArena:
             "human_combo_broken": self._human_broke.copy(),
             "human_combo_countered": self._human_countered.copy(),
             "got_comboed": self._got_comboed.copy(),
+            "terrain_blocked": flags["terrain_blocked"].copy(),
+            "pit_blocked": flags["pit_blocked"].copy(),
+            "enemy_terrain_blocked": flags["enemy_terrain_blocked"].copy(),
+            "terrain_kind": self.terrain.kind.copy(),
             "stun": L.stun.copy(),
             **{k: v for k, v in flags.items()},
         }
@@ -1656,12 +1730,17 @@ class ProPvPEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, max_steps: int = MAX_STEPS, seed: int | None = None):
+    def __init__(
+        self, max_steps: int = MAX_STEPS, seed: int | None = None,
+        terrain_mix: float = 0.0, terrain_obs: bool = False,
+    ):
         super().__init__()
+        self.terrain_obs = bool(terrain_obs)
         self.action_space = spaces.Discrete(N_ACTIONS)
-        self.observation_space = spaces.Box(-1.0, 2.0, (OBS_DIM,), np.float32)
+        obs_dim = TERRAIN_OBS_DIM if self.terrain_obs else OBS_DIM
+        self.observation_space = spaces.Box(-1.0, 2.0, (obs_dim,), np.float32)
         self.max_steps = max_steps
-        self.core = ProArena(1, seed=seed)
+        self.core = ProArena(1, seed=seed, terrain_mix=terrain_mix, terrain_obs=self.terrain_obs)
         self._prev_dist = 0.0
         self.consumables_used: dict[str, int] = {}
         self._kits: tuple[str, str, str, str] = ("", "", "", "")
@@ -1670,6 +1749,7 @@ class ProPvPEnv(gym.Env):
         super().reset(seed=seed)
         if seed is not None:
             self.core.rng = np.random.default_rng(seed)
+            self.core.terrain.rng = self.core.rng
         self.core.reset()
         self.consumables_used = {}
         self._kits = self.core.kits()[0]
@@ -1697,6 +1777,9 @@ class ProPvPEnv(gym.Env):
             "used_consumable": used,
             "placed_block": used if used in ("block_barricade", "pillar_jump") else None,
             "wasted_consumable": bool(info["waste"][0]),
+            "terrain_blocked": bool(info["terrain_blocked"][0]),
+            "pit_blocked": bool(info["pit_blocked"][0]),
+            "terrain_kind": int(info["terrain_kind"][0]),
             "shield_broken": bool(info["shield_broken"][0]),
             "blocked_hit": bool(info["blocked_hit"][0]),
             "trapped_enemy": bool(info["trapped_enemy"][0]),
@@ -1726,13 +1809,22 @@ class ProPvPEnv(gym.Env):
 class ProPvPVecEnv(VecEnv):
     """SB3 VecEnv over the vectorised PRO arena."""
 
-    def __init__(self, n_envs: int = 128, seed: int = 0, difficulty: float = 1.0):
-        super().__init__(n_envs, spaces.Box(-1.0, 2.0, (OBS_DIM,), np.float32),
+    def __init__(
+        self, n_envs: int = 128, seed: int = 0, difficulty: float = 1.0,
+        terrain_mix: float = 0.0, terrain_obs: bool = False,
+    ):
+        self.terrain_obs = bool(terrain_obs)
+        obs_dim = TERRAIN_OBS_DIM if self.terrain_obs else OBS_DIM
+        super().__init__(n_envs, spaces.Box(-1.0, 2.0, (obs_dim,), np.float32),
                          spaces.Discrete(N_ACTIONS))
-        self.core = ProArena(n_envs, seed=seed, difficulty=difficulty)
+        self.core = ProArena(n_envs, seed=seed, difficulty=difficulty,
+                             terrain_mix=terrain_mix, terrain_obs=self.terrain_obs)
         self._obs = self.core.reset()
         self._actions = np.zeros(n_envs, np.int32)
         self.episodes = 0
+        self.fight_limit: int | None = None
+        self.fight_quota: np.ndarray | None = None
+        self.completed_by_env = np.zeros(n_envs, np.int32)
         self.wins = 0
         self.losses = 0
         self.draws = 0
@@ -1744,14 +1836,8 @@ class ProPvPVecEnv(VecEnv):
         self.combo_hits = 0
         self.chains_suffered = 0
         self.chain_len_sum = 0
-
-    def set_combo_curriculum(self, share: float) -> None:
-        """Share (0..1) of new fights that start with the learner already in a chain."""
-        self.combo_curriculum = float(np.clip(share, 0.0, 0.9))
-
-    def set_aggression(self, value: float) -> None:
-        """0..1 — how relentlessly the scripted pro chases combo chains."""
-        self.e_aggression = float(np.clip(value, 0.0, 1.0))
+        self.terrain_blocked = 0
+        self.pit_blocked = 0
 
     def set_ai_action(self, action) -> None:
         """Queue the action the AI opponent should execute on the next step."""
@@ -1767,9 +1853,22 @@ class ProPvPVecEnv(VecEnv):
     def set_enemy_skill(self, value: float) -> None:
         self.core.set_enemy_skill(value)
 
-    def set_combo_curriculum(self, share: float) -> None:
-        """Share (0..1) of new fights that start with the learner already in a chain."""
-        self.combo_curriculum = float(np.clip(share, 0.0, 0.9))
+    def set_terrain_mix(self, value: float) -> None:
+        self.core.set_terrain_mix(value)
+
+    def set_fight_limit(self, value: int | None) -> None:
+        """Allocate an exact fight quota across arenas and freeze each row at its quota."""
+        if value is None:
+            self.fight_limit = None
+            self.fight_quota = None
+            self.completed_by_env.fill(0)
+            return
+        self.fight_limit = max(0, int(value))
+        base, remainder = divmod(self.fight_limit, self.num_envs)
+        self.fight_quota = np.full(self.num_envs, base, np.int32)
+        self.fight_quota[:remainder] += 1
+        self.completed_by_env.fill(0)
+        self.episodes = 0
 
     def set_aggression(self, value: float) -> None:
         self.core.set_aggression(value)
@@ -1777,7 +1876,43 @@ class ProPvPVecEnv(VecEnv):
     def set_combo_curriculum(self, share: float) -> None:
         self.core.set_combo_curriculum(share)
 
+    def _snapshot_rows(self, mask: np.ndarray) -> dict:
+        indices = np.flatnonzero(mask)
+        snapshot = {}
+        owners = {
+            "core": self.core,
+            "learner": self.core.L,
+            "enemy": self.core.E,
+            "terrain": self.core.terrain,
+        }
+        for owner_name, owner in owners.items():
+            arrays = {}
+            for name, value in vars(owner).items():
+                if isinstance(value, np.ndarray) and value.ndim > 0 \
+                        and value.shape[0] == self.num_envs:
+                    arrays[name] = value[mask].copy()
+            snapshot[owner_name] = arrays
+        snapshot["events"] = [copy.deepcopy(self.core.events[i]) for i in indices]
+        snapshot["indices"] = indices
+        return snapshot
+
+    def _restore_rows(self, mask: np.ndarray, snapshot: dict) -> None:
+        owners = {
+            "core": self.core,
+            "learner": self.core.L,
+            "enemy": self.core.E,
+            "terrain": self.core.terrain,
+        }
+        for owner_name, owner in owners.items():
+            for name, value in snapshot[owner_name].items():
+                getattr(owner, name)[mask] = value
+        for index, event in zip(snapshot["indices"], snapshot["events"]):
+            self.core.events[int(index)] = event
+
     def reset(self):
+        if self.fight_quota is not None:
+            self.completed_by_env.fill(0)
+            self.episodes = 0
         self._obs = self.core.reset()
         return self._obs.copy()
 
@@ -1785,12 +1920,29 @@ class ProPvPVecEnv(VecEnv):
         self._actions = np.asarray(actions, np.int32)
 
     def step_wait(self):
+        if self.fight_limit is not None and self.episodes >= self.fight_limit:
+            # Let SB3 finish its current PPO rollout without simulating/counting extra fights.
+            return (self._obs.copy(), np.zeros(self.num_envs, np.float32),
+                    np.zeros(self.num_envs, bool), [{} for _ in range(self.num_envs)])
+        frozen = (self.completed_by_env >= self.fight_quota
+                  if self.fight_quota is not None else np.zeros(self.num_envs, bool))
+        snapshot = self._snapshot_rows(frozen) if bool(frozen.any()) else None
         obs, rew, term, trunc, done, info = self.core.step(self._actions)
-        self.combo_breaks += int(np.count_nonzero(info["combo_broken"]))
-        self.combo_counters += int(np.count_nonzero(info["combo_countered"]))
-        self.combo_hits += int(np.count_nonzero(info["combo_hit"]))
+        if snapshot is not None:
+            self._restore_rows(frozen, snapshot)
+            obs[frozen] = self._obs[frozen]
+            rew[frozen] = 0.0
+            term[frozen] = False
+            trunc[frozen] = False
+            done[frozen] = False
+        active = ~frozen
+        self.combo_breaks += int(np.count_nonzero(info["combo_broken"] & active))
+        self.combo_counters += int(np.count_nonzero(info["combo_countered"] & active))
+        self.combo_hits += int(np.count_nonzero(info["combo_hit"] & active))
+        self.terrain_blocked += int(np.count_nonzero(info["terrain_blocked"] & active))
+        self.pit_blocked += int(np.count_nonzero(info["pit_blocked"] & active))
         infos: list[dict] = [{} for _ in range(self.num_envs)]
-        done_idx = np.flatnonzero(done)
+        done_idx = np.flatnonzero(done & active)
         if len(done_idx):
             kits = self.core.kits()
             row_mask = np.zeros(self.num_envs, bool)
@@ -1798,6 +1950,8 @@ class ProPvPVecEnv(VecEnv):
                 won = bool(info["enemy_dead"][i]) and not bool(info["learner_dead"][i])
                 lost = bool(info["learner_dead"][i]) and not bool(info["enemy_dead"][i])
                 self.episodes += 1
+                if self.fight_quota is not None:
+                    self.completed_by_env[i] += 1
                 self.chain_len_sum += int(info["combo_taken"][i])
                 if int(info["combo_taken"][i]) > 0:
                     self.chains_suffered += 1
@@ -1840,13 +1994,16 @@ class ProPvPVecEnv(VecEnv):
                     "combo_landed": int(info["combo_landed"][i]),
                     "combo_broken": bool(info["combo_broken"][i]),
                     "combo_countered": bool(info["combo_countered"][i]),
+                    "terrain_kind": int(info["terrain_kind"][i]),
+                    "terrain_blocked": bool(info["terrain_blocked"][i]),
+                    "pit_blocked": bool(info["pit_blocked"][i]),
                     "consumables_summary": cons,
                 }
                 row_mask[i] = True
             self.core.reset(row_mask)
             obs = self.core._obs()
         self._obs = obs
-        return obs.copy(), rew.copy(), term.copy(), infos
+        return obs.copy(), rew.copy(), done.copy(), infos
 
     def close(self):
         pass

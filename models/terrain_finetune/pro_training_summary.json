@@ -1,0 +1,40 @@
+{
+  "fights": 10000,
+  "wins": 7503,
+  "losses": 2450,
+  "draws": 47,
+  "win_rate_recent_200": 0.69,
+  "terrain_mix": 1.0,
+  "terrain_blocked_steps": 203924,
+  "pit_blocked_steps": 10466,
+  "timesteps": 688128,
+  "elapsed_sec": 123.8,
+  "combos": {
+    "breaks": 2833,
+    "counters": 147,
+    "hits": 1640,
+    "chains": 203,
+    "chain_len": 257
+  },
+  "techniques": {
+    "block_barricade": 379,
+    "buff_potion": 1595,
+    "cobweb_trap": 2032,
+    "combo_break": 2833,
+    "combo_counter": 147,
+    "end_crystal": 705,
+    "ender_pearl": 2497,
+    "golden_apple": 5761,
+    "instant_heal": 4909,
+    "lava_trap": 1650,
+    "obsidian_cage": 12671,
+    "pearl_crystal": 94,
+    "pillar_jump": 3560,
+    "ranged": 3722,
+    "respawn_anchor": 599,
+    "shield_block": 0,
+    "tnt_minecart": 1712,
+    "water_bucket": 420,
+    "wtap_combo": 1073
+  }
+}
