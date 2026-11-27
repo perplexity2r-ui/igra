@@ -130,12 +130,12 @@ per group:
 
 | Opponents | Wins | Losses | Draws | Win rate |
 |---:|---:|---:|---:|---:|
-| 3 | 62 | 136 | 2 | 31.0% |
-| 4 | 29 | 170 | 1 | 14.5% |
-| 5 | 28 | 172 | 0 | 14.0% |
-| 6 | 5 | 193 | 2 | 2.5% |
+| 3 | 58 | 140 | 2 | 29.0% |
+| 4 | 30 | 170 | 0 | 15.0% |
+| 5 | 22 | 178 | 0 | 11.0% |
+| 6 | 12 | 188 | 0 | 6.0% |
 | 7 | 4 | 196 | 0 | 2.0% |
-| 8 | 3 | 197 | 0 | 1.5% |
+| 8 | 1 | 199 | 0 | 0.5% |
 
 This is not stable winning and does not meet the no-loss goal. Three additional exact
 50,000-fight refinements (hard-crowd sampling, target focus, and win/death reward

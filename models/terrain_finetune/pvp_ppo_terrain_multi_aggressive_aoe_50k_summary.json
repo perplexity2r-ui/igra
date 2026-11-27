@@ -66,12 +66,12 @@
     "deterministic": true,
     "target_selection": "distance plus 0.15 times effective health, visibility/player priorities retained",
     "groups": {
-      "3": {"wins": 62, "losses": 136, "draws": 2},
-      "4": {"wins": 29, "losses": 170, "draws": 1},
-      "5": {"wins": 28, "losses": 172, "draws": 0},
-      "6": {"wins": 5, "losses": 193, "draws": 2},
+      "3": {"wins": 58, "losses": 140, "draws": 2},
+      "4": {"wins": 30, "losses": 170, "draws": 0},
+      "5": {"wins": 22, "losses": 178, "draws": 0},
+      "6": {"wins": 12, "losses": 188, "draws": 0},
       "7": {"wins": 4, "losses": 196, "draws": 0},
-      "8": {"wins": 3, "losses": 197, "draws": 0}
+      "8": {"wins": 1, "losses": 199, "draws": 0}
     },
     "stable_win_goal_met": false
   }
