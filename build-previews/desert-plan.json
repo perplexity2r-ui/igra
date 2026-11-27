@@ -1,0 +1,28 @@
+{
+  "theme_id": 2,
+  "theme": "Desert Courtyard",
+  "choices": [
+    2,
+    2,
+    6,
+    0,
+    6,
+    6,
+    2
+  ],
+  "design": {
+    "courtyard villa": 2,
+    "sandstone and acacia": 2,
+    "stepped roof": 6,
+    "symmetric casements": 0,
+    "double entry": 6,
+    "carved trim": 6,
+    "courtyard fountain": 2
+  },
+  "rotation": 0,
+  "lot_scale": 1,
+  "season": null,
+  "reward": 0.8910598269530704,
+  "checkpoint": "models/builder/builder_500000_episodes",
+  "block_count": 537
+}

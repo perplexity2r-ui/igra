@@ -1,0 +1,46 @@
+{
+  "theme_id": 2,
+  "theme": "Desert Courtyard",
+  "choices": [
+    2,
+    2,
+    6,
+    0,
+    6,
+    6,
+    2
+  ],
+  "design": {
+    "courtyard villa": 2,
+    "sandstone and acacia": 2,
+    "stepped roof": 6,
+    "symmetric casements": 0,
+    "double entry": 6,
+    "carved trim": 6,
+    "courtyard fountain": 2
+  },
+  "rotation": 0,
+  "lot_scale": 2,
+  "season": 2,
+  "reward": 0.8910598269530704,
+  "checkpoint": "models/builder/builder_500000_episodes",
+  "structure": "neural voxel mansion",
+  "block_generator": "models/builder/voxel_mansion_net.pt",
+  "generation_method": "the voxel network predicts a block token independently for every grid coordinate; no mansion renderer is called at inference",
+  "origin": [
+    100,
+    64,
+    100
+  ],
+  "block_count": 2971,
+  "block_histogram": {
+    "minecraft:acacia_door": 7,
+    "minecraft:acacia_leaves": 171,
+    "minecraft:acacia_log": 40,
+    "minecraft:cut_sandstone": 828,
+    "minecraft:lantern": 1,
+    "minecraft:oak_fence": 4,
+    "minecraft:red_sandstone": 1036,
+    "minecraft:sandstone": 884
+  }
+}

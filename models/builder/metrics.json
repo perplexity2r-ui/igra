@@ -1,0 +1,15 @@
+{
+  "target_episodes": 500000,
+  "completed_episodes": 500000,
+  "starting_episodes_this_run": 50000,
+  "episodes_this_run": 450000,
+  "seed_this_run": 20261125,
+  "mean_reward": 4.984851039136001,
+  "mean_quality": 0.9391555486593581,
+  "mean_reward_this_run": 4.988956533791113,
+  "mean_quality_this_run": 0.9398961635542076,
+  "recent_mean_reward_100": 4.96009185,
+  "recent_mean_quality_100": 0.9347538923064868,
+  "elapsed_seconds_this_run": 2135.033741927,
+  "cumulative_elapsed_seconds": 2390.764523706999
+}

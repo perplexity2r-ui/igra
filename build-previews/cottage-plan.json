@@ -1,0 +1,28 @@
+{
+  "theme_id": 0,
+  "theme": "Woodland Cottage",
+  "choices": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "design": {
+    "cozy square": 0,
+    "oak and cobble": 0,
+    "steep gable": 0,
+    "symmetric casements": 0,
+    "central porch": 0,
+    "chimney": 0,
+    "cottage garden": 0
+  },
+  "rotation": 0,
+  "lot_scale": 1,
+  "season": null,
+  "reward": 0.9809133059827108,
+  "checkpoint": "models/builder/builder_500000_episodes",
+  "block_count": 429
+}

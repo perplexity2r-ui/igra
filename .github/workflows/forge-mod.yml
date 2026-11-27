@@ -1,0 +1,83 @@
+name: Build Forge mod
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'forge-mod/**'
+      - '.github/workflows/forge-mod.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { fg: '5', gradle: '7.6.4', java: '8' }
+          - { fg: '6', gradle: '8.1.1', java: '17' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ matrix.gradle }}
+
+      - name: Prepare variant
+        working-directory: forge-mod
+        shell: bash
+        run: |
+          if [ "${{ matrix.fg }}" = "6" ]; then
+            cp build-fg6.gradle build.gradle
+            cp settings-fg6.gradle settings.gradle
+            cp gradle-fg6.properties gradle.properties
+          fi
+
+      - name: Build
+        id: buildstep
+        working-directory: forge-mod
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle build --no-daemon -x test 2>&1 | tee build.log
+
+      - name: Publish result branch
+        working-directory: forge-mod
+        shell: bash
+        run: |
+          cd ..
+          git config user.name "ci-bot"
+          git config user.email "ci@users.noreply.github.com"
+          BRANCH="forge-dist-fg${{ matrix.fg }}"
+          mkdir -p dist
+          cp forge-mod/build.log dist/build.log
+          JAR="$(find forge-mod/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*sources.jar' -print -quit 2>/dev/null || true)"
+          if [ "${{ steps.buildstep.outcome }}" = "success" ] && [ -n "$JAR" ]; then
+            cp "$JAR" dist/aipilot-1.16.5.jar
+            echo "Published mod from $JAR"
+            MSG="AI Pilot OK fg${{ matrix.fg }} (${GITHUB_SHA::7})"
+          else
+            echo "No successful mod jar found (build outcome: ${{ steps.buildstep.outcome }})"
+            MSG="AI Pilot FAILED fg${{ matrix.fg }} (${GITHUB_SHA::7})"
+          fi
+          git checkout -q -B "$BRANCH"
+          git add -f dist
+          git commit -q -m "$MSG" || echo "nothing to commit"
+          git push -f origin "$BRANCH"
+
+      - name: Fail the workflow if the build failed
+        if: steps.buildstep.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::error::Forge build failed. The full log is on forge-dist-fg${{ matrix.fg }}:dist/build.log"
+          exit 1

@@ -1,0 +1,37 @@
+{
+  "fights": 501207,
+  "wins": 382654,
+  "losses": 115752,
+  "draws": 2801,
+  "win_rate_recent_200": 0.75,
+  "timesteps": 26738688,
+  "elapsed_sec": 2372.4,
+  "combos": {
+    "breaks": 122374,
+    "counters": 4230,
+    "hits": 34064,
+    "chains": 3891,
+    "chain_len": 7381
+  },
+  "techniques": {
+    "block_barricade": 8029,
+    "buff_potion": 87110,
+    "cobweb_trap": 57161,
+    "combo_break": 121966,
+    "combo_counter": 4217,
+    "end_crystal": 4554,
+    "ender_pearl": 82027,
+    "golden_apple": 302605,
+    "instant_heal": 265665,
+    "lava_trap": 42301,
+    "obsidian_cage": 593579,
+    "pearl_crystal": 6525,
+    "pillar_jump": 145500,
+    "ranged": 190155,
+    "respawn_anchor": 6184,
+    "shield_block": 0,
+    "tnt_minecart": 26614,
+    "water_bucket": 12269,
+    "wtap_combo": 34766
+  }
+}

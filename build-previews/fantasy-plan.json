@@ -1,0 +1,28 @@
+{
+  "theme_id": 3,
+  "theme": "Enchanted Keep",
+  "choices": [
+    6,
+    6,
+    6,
+    6,
+    6,
+    6,
+    3
+  ],
+  "design": {
+    "twin wings": 6,
+    "enchanted teal": 6,
+    "stepped roof": 6,
+    "stained glass": 6,
+    "double entry": 6,
+    "carved trim": 6,
+    "enchanted grove": 3
+  },
+  "rotation": 0,
+  "lot_scale": 1,
+  "season": null,
+  "reward": 0.9230626622078911,
+  "checkpoint": "models/builder/builder_500000_episodes",
+  "block_count": 631
+}

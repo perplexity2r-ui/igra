@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Играть против ИИ — Minecraft 1.16.5 PvP</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0b0f18; color: #e6edf7;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+  }
+  header { width: 100%; max-width: 1180px; padding: 14px 18px 6px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+  h1 { font-size: 19px; margin: 0; letter-spacing: .2px; }
+  .sub { color: #8b9bb4; font-size: 13px; }
+  .badge { margin-left: auto; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #1a2333; color: #7dd3fc; border: 1px solid #24304a; }
+  main { width: 100%; max-width: 1180px; display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 14px; padding: 8px 18px 26px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  #arenaWrap { position: relative; background: #0e1420; border: 1px solid #1d283b; border-radius: 12px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: auto; }
+  .overlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(8,12,20,.82); backdrop-filter: blur(2px); flex-direction: column; gap: 12px; text-align: center; padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h2 { margin: 0; font-size: 26px; }
+  .overlay p { margin: 0; color: #9fb0c8; }
+  button {
+    font: inherit; border-radius: 9px; border: 1px solid #2a3a55; background: #16202f; color: #dbe6f5;
+    padding: 9px 12px; cursor: pointer; transition: .12s; user-select: none;
+  }
+  button:hover { background: #1e2b3f; border-color: #3a527a; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: #1d4ed8; border-color: #2f6bf0; color: #fff; font-weight: 600; padding: 11px 22px; }
+  button.primary:hover { background: #2563eb; }
+  .side { display: flex; flex-direction: column; gap: 12px; }
+  .card { background: #101725; border: 1px solid #1d283b; border-radius: 12px; padding: 12px; }
+  .card h3 { margin: 0 0 9px; font-size: 13px; color: #8fa4c2; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
+  .bar { height: 16px; background: #1b2434; border-radius: 6px; overflow: hidden; position: relative; }
+  .bar > i { display: block; height: 100%; transition: width .18s; }
+  .hpYou { background: linear-gradient(90deg,#22c55e,#4ade80); }
+  .hpAI  { background: linear-gradient(90deg,#dc2626,#f87171); }
+  .abs { position: absolute; top: 0; left: 0; height: 100%; background: #eab308; opacity: .55; }
+  .row { display: flex; justify-content: space-between; font-size: 13px; margin: 3px 0; }
+  .row span:last-child { color: #a9bcd8; font-variant-numeric: tabular-nums; }
+  .kit { font-size: 12px; color: #9db0cc; line-height: 1.55; }
+  .kit b { color: #dbe8fb; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .grid button { padding: 8px 4px; font-size: 12px; }
+  .grid .wide { grid-column: span 2; }
+  .tech { font-size: 11px; }
+  #log { font-size: 12px; color: #9fb0c8; line-height: 1.6; max-height: 118px; overflow: hidden; }
+  #log div { border-bottom: 1px dashed #1b2434; padding: 2px 0; }
+  .score { display: flex; gap: 14px; font-size: 13px; }
+  .score b { font-variant-numeric: tabular-nums; }
+  .hint { font-size: 11.5px; color: #7d8fa8; margin-top: 6px; line-height: 1.5; }
+  .lvl { padding: 4px 8px; font-size: 11.5px; border-radius: 7px; margin-left: 3px; }
+  .lvl.active { background: #1d4ed8; border-color: #2f6bf0; color: #fff; font-weight: 600; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align: middle;}
+  .on { background:#22c55e; } .off { background:#475569; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚔️ Играть против нейросети</h1>
+  <span class="sub">PPO после 500 000 боёв · Minecraft 1.16.5 PvP</span>
+  <span class="badge" id="status"><span class="dot off"></span>соединение…</span>
+</header>
+
+<main>
+  <div>
+    <div id="arenaWrap">
+      <canvas id="arena" width="880" height="620"></canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="ovTitle">Бой окончен</h2>
+        <p id="ovText"></p>
+        <button class="primary" id="ovBtn">Новый бой</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3>Управление</h3>
+      <div class="grid" id="pad"></div>
+      <div class="hint">
+        Клавиатура: <b>W A S D</b> — ходить, <b>Пробел</b> — прыжок, <b>ЛКМ / E</b> — удар,
+        <b>Shift</b> — спринт-удар, <b>Q</b> — щит, <b>1–9</b> — снаряжение и взрывчатка.
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <h3>Счёт</h3>
+      <div class="score">
+        <span>Ты <b id="scYou">0</b></span>
+        <span>ИИ <b id="scAI">0</b></span>
+        <span>Ничьи <b id="scDraw">0</b></span>
+      </div>
+      <div class="row"><span>Дистанция</span><span id="dist">—</span></div>
+      <div class="row"><span>Ход</span><span id="step">0</span></div>
+      <div class="row" style="margin-top:8px">
+        <span>Сложность</span>
+        <span id="lvlBtns">
+          <button data-lvl="easy" class="lvl">Лёгкий</button>
+          <button data-lvl="normal" class="lvl">Обычный</button>
+          <button data-lvl="pro" class="lvl">Про</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Твоё здоровье</h3>
+      <div class="bar"><i class="hpYou" id="hpYouBar" style="width:100%"></i></div>
+      <div class="row"><span id="hpYouTxt">20.0 / 20</span><span id="youState"></span></div>
+      <div class="row" id="comboRow" style="display:none">
+        <span>Тебя в комбо</span><span id="comboTaken">0</span>
+      </div>
+      <div class="kit" id="youKit"></div>
+    </div>
+
+    <div class="card">
+      <h3>Нейросеть</h3>
+      <div class="bar"><i class="hpAI" id="hpAIBar" style="width:100%"></i></div>
+      <div class="row"><span id="hpAITxt">20.0 / 20</span><span id="aiState"></span></div>
+      <div class="kit" id="aiKit"></div>
+    </div>
+
+    <div class="card">
+      <h3>Лог боя</h3>
+      <div id="log"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const arena = document.getElementById('arena');
+const ctx = arena.getContext('2d');
+
+// ---- actions: id, label, hotkey -------------------------------------------
+const PAD = [
+  [5,  'Удар', 'E'],   [1,  'Вперёд', 'W'],  [9,  'Спринт-удар', '⇧W'], [8,  'Прыжок', '␣'],
+  [3,  'Влево', 'A'],  [2,  'Отход', 'S'],   [4,  'Вправо', 'D'],       [10, 'Спринт', '⇧'],
+  [26, 'W-tap', 'X'],  [12, 'Щит', 'Q'],     [21, 'Pillar', '2'],       [18, 'Баррикада', '3'],
+  [17, 'Дальний бой', '4'], [19, 'Паутина/лава', '5'], [20, 'Вода', '6'], [13, 'Геппл', '1'],
+  [14, 'Хил', '7'],    [16, 'Бафф', '8'],    [15, 'Перл', '9'],         [22, 'Кристалл', 'C'],
+  [23, 'Якорь', 'V'],  [24, 'TNT-вагонетка', 'B'], [25, 'Клетка', 'N'], [27, 'Перл+кристалл', 'M'],
+  [28, 'ВЫЙТИ ИЗ КОМБО', 'R'], [29, 'КОНТР-КОМБО', 'T'],
+];
+const KEYMAP = { 'e': 5, 'w': 1, 'a': 3, 's': 2, 'd': 4, ' ': 8, 'q': 12, 'x': 26,
+                 '1': 13, '2': 21, '3': 18, '4': 17, '5': 19, '6': 20,
+                 '7': 14, '8': 16, '9': 15, 'c': 22, 'v': 23, 'b': 24, 'n': 25, 'm': 27,
+                 'r': 28, 't': 29 };
+
+const padEl = document.getElementById('pad');
+for (const [id, label, key] of PAD) {
+  const b = document.createElement('button');
+  b.innerHTML = label + (key ? ` <span style="opacity:.45;font-size:10px">${key}</span>` : '');
+  b.title = 'Действие ' + id;
+  if (id === 28 || id === 29) {
+    b.style.background = id === 28 ? '#3f1d1d' : '#1d2f3f';
+    b.style.borderColor = id === 28 ? '#7f2d2d' : '#2d5a7f';
+    b.style.fontWeight = '600';
+  }
+  b.onclick = () => sendAction(id);
+  padEl.appendChild(b);
+}
+
+// ---- state -----------------------------------------------------------------
+let state = null;
+let ws = null;
+let smooth = { you: [0,0], ai: [0,0] };
+const logLines = [];
+
+function setStatus(on, text) {
+  document.getElementById('status').innerHTML =
+    `<span class="dot ${on ? 'on' : 'off'}"></span>${text}`;
+}
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: 'no-store'
+  });
+  return res.json();
+}
+
+async function connect() {
+  try {
+    const st = await api('/api/state');
+    setStatus(true, 'на связи');
+    applyState(st);
+  } catch (e) {
+    setStatus(false, 'нет связи с ареной');
+    setTimeout(connect, 1500);
+  }
+}
+
+let busy = false;
+async function sendAction(id) {
+  if (busy) return;
+  busy = true;
+  try {
+    const st = await api('/api/action', { action: id });
+    applyState(st);
+    setStatus(true, 'на связи');
+  } catch (e) {
+    setStatus(false, 'нет связи с ареной');
+    setTimeout(connect, 800);
+  } finally {
+    busy = false;
+  }
+}
+
+function applyState(s) {
+  state = s;
+  pending = false;
+  if (!smooth.ready) { smooth.you = [s.you.x, s.you.z]; smooth.ai = [s.ai.x, s.ai.z]; smooth.ready = true; }
+
+  document.getElementById('scYou').textContent = s.score.you;
+  document.getElementById('scAI').textContent = s.score.ai;
+  document.getElementById('scDraw').textContent = s.score.draws;
+  document.getElementById('dist').textContent = s.distance.toFixed(1) + ' бл.';
+  document.getElementById('step').textContent = s.step;
+
+  setBar('hpYouBar', s.you.hp, 20);
+  setBar('hpAIBar', s.ai.hp, s.ai_max_hp || 20);
+  document.querySelectorAll('.lvl').forEach(b =>
+    b.classList.toggle('active', b.dataset.lvl === s.level));
+  document.getElementById('hpYouTxt').textContent = s.you.hp.toFixed(1) + ' / 20' +
+    (s.you.absorption > 0.05 ? `  +${s.you.absorption.toFixed(1)}🛡` : '');
+  document.getElementById('hpAITxt').textContent = s.ai.hp.toFixed(1) + ' / ' + (s.ai_max_hp || 20).toFixed(0) +
+    (s.ai.absorption > 0.05 ? `  +${s.ai.absorption.toFixed(1)}🛡` : '');
+
+  document.getElementById('youState').textContent = bits(s.you);
+  const comboRow = document.getElementById('comboRow');
+  if (s.you.combo_taken > 0) {
+    comboRow.style.display = 'flex';
+    document.getElementById('comboTaken').textContent = s.you.combo_taken + ' — жми R!';
+  } else {
+    comboRow.style.display = 'none';
+  }
+  document.getElementById('aiState').textContent = bits(s.ai);
+
+  document.getElementById('youKit').innerHTML = kitLine(s.you);
+  document.getElementById('aiKit').innerHTML = kitLine(s.ai);
+
+  if (s.events && s.events[0]) pushLog(s.events[0]);
+
+  const ov = document.getElementById('overlay');
+  if (s.over) {
+    ov.classList.add('show');
+    const titles = { win: '🏆 Победа!', lose: '💀 Поражение', timeout: '⏱ Ничья' };
+    document.getElementById('ovTitle').textContent = titles[s.result] || 'Бой окончен';
+    document.getElementById('ovText').textContent =
+      s.result === 'win' ? 'Ты обыграл нейросеть. Ещё разок?'
+      : s.result === 'lose' ? 'ИИ оказался сильнее. Попробуй другую тактику.'
+      : 'Время вышло — оба выжили.';
+  } else {
+    ov.classList.remove('show');
+  }
+  draw();
+}
+
+function bits(b) {
+  const out = [];
+  if (b.shield_up) out.push('🛡 щит');
+  if (b.on_fire) out.push('🔥 горит');
+  if (b.in_web) out.push('🕸 паутина');
+  if (b.in_lava) out.push('🌋 лава');
+  if (b.slowed) out.push('🐌 замедлен');
+  if (b.buff) out.push('⚡ бафф');
+  if (b.caged) out.push('🧱 клетка');
+  return out.join(' ');
+}
+
+function kitLine(k) {
+  const parts = [`<b>${k.weapon}</b> (${k.damage.toFixed(1)}⚔, ${(k.cooldown*1000).toFixed(0)}мс)`];
+  const gear = [];
+  if (k.crystals) gear.push(`💎${k.crystals}`);
+  if (k.obsidian) gear.push(`⬛${k.obsidian}`);
+  if (k.anchors) gear.push(`⚓${k.anchors}`);
+  if (k.minecarts) gear.push(`🚃${k.minecarts}`);
+  if (k.gaps) gear.push(`🍎${k.gaps}`);
+  if (k.splashes) gear.push(`🧪${k.splashes}`);
+  if (k.pearls) gear.push(`🔮${k.pearls}`);
+  if (k.buffs) gear.push(`⚗️${k.buffs}`);
+  if (k.ranged) gear.push(`🏹${k.ranged}`);
+  if (k.blocks) gear.push(`🧱${k.blocks}`);
+  if (k.cobwebs) gear.push(`🕸${k.cobwebs}`);
+  if (k.lava) gear.push(`🌋${k.lava}`);
+  if (k.water) gear.push(`💧${k.water}`);
+  if (k.shield) parts.push('щит');
+  if (k.totem) parts.push('тотем');
+  return parts.join(' · ') + `<br>${k.armor} (${(k.reduction*100).toFixed(0)}% брони)  ${gear.join(' ')}`;
+}
+
+function setBar(id, hp, maxHp) {
+  const el = document.getElementById(id);
+  const cap = maxHp || 20;
+  el.style.width = Math.max(0, Math.min(100, hp / cap * 100)) + '%';
+  el.style.background = hp > 12
+    ? (id === 'hpYouBar' ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'linear-gradient(90deg,#dc2626,#f87171)')
+    : hp > 6
+      ? 'linear-gradient(90deg,#eab308,#facc15)'
+      : 'linear-gradient(90deg,#b91c1c,#ef4444)';
+}
+
+function pushLog(line) {
+  if (logLines[0] === line) return;
+  logLines.unshift(line);
+  if (logLines.length > 9) logLines.pop();
+  document.getElementById('log').innerHTML = logLines.map(l => `<div>${l}</div>`).join('');
+}
+
+document.getElementById('ovBtn').onclick = () => {
+  document.getElementById('overlay').classList.remove('show');
+  api('/api/reset', {}).then(applyState).catch(() => {});
+};
+
+document.querySelectorAll('.lvl').forEach(btn => {
+  btn.onclick = () => {
+    api('/api/level', { level: btn.dataset.lvl }).then(applyState).catch(() => {});
+  };
+});
+
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (e.key === ' ') e.preventDefault();
+  if (e.shiftKey && (k === 'w' || k === 'd')) { sendAction(9); return; }
+  if (k === 'shift') { sendAction(10); return; }
+  const id = KEYMAP[e.key === ' ' ? ' ' : k];
+  if (id !== undefined) sendAction(id);
+});
+
+// ---- rendering -------------------------------------------------------------
+const BOUND = 9.2, MARGIN = 40;
+function scale() {
+  const w = arena.width, h = arena.height;
+  return Math.min((w - MARGIN * 2) / (BOUND * 2), (h - MARGIN * 2) / (BOUND * 2));
+}
+function toPx(x, z, s) {
+  return [arena.width / 2 + x * s, arena.height / 2 + z * s];
+}
+
+function drawEntity(x, z, color, label, hp, extra, maxHp) {
+  const s = scale();
+  const [px, py] = toPx(x, z, s);
+  ctx.beginPath();
+  ctx.arc(px, py, 15, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(255,255,255,.85)';
+  ctx.stroke();
+
+  ctx.fillStyle = '#08111d';
+  ctx.font = 'bold 11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, px, py + 0.5);
+
+  // hp ring
+  ctx.beginPath();
+  ctx.arc(px, py, 20, -Math.PI / 2,
+          -Math.PI / 2 + Math.PI * 2 * Math.max(0, Math.min(1, hp / (maxHp || 20))));
+  ctx.strokeStyle = hp > 12 ? '#22c55e' : hp > 6 ? '#eab308' : '#ef4444';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  if (extra) {
+    ctx.fillStyle = '#c9d7ea';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText(extra, px, py + 33);
+  }
+}
+
+function draw() {
+  const w = arena.width, h = arena.height, s = scale();
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0e1420';
+  ctx.fillRect(0, 0, w, h);
+
+  // arena floor
+  const [x0, y0] = toPx(-BOUND, -BOUND, s);
+  const size = BOUND * 2 * s;
+  ctx.fillStyle = '#1b2534';
+  ctx.fillRect(x0, y0, size, size);
+  ctx.strokeStyle = '#2a3a52';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x0, y0, size, size);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,.045)';
+  ctx.lineWidth = 1;
+  for (let g = -9; g <= 9; g++) {
+    const [gx] = toPx(g, 0, s); const [, gy] = toPx(0, g, s);
+    ctx.beginPath(); ctx.moveTo(gx, y0); ctx.lineTo(gx, y0 + size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x0 + size, gy); ctx.stroke();
+  }
+
+  if (!state) return;
+
+  // obstacles
+  for (const [ox, oz, ttl] of state.obstacles) {
+    const [px, py] = toPx(ox, oz, s);
+    ctx.fillStyle = `rgba(120,146,190,${0.22 + 0.16 * Math.min(1, ttl / 12)})`;
+    ctx.fillRect(px - 13, py - 13, 26, 26);
+    ctx.strokeStyle = 'rgba(160,190,235,.55)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(px - 13, py - 13, 26, 26);
+  }
+
+  // smoothing
+  smooth.you[0] += (state.you.x - smooth.you[0]) * 0.35;
+  smooth.you[1] += (state.you.z - smooth.you[1]) * 0.35;
+  smooth.ai[0] += (state.ai.x - smooth.ai[0]) * 0.35;
+  smooth.ai[1] += (state.ai.z - smooth.ai[1]) * 0.35;
+
+  drawEntity(smooth.ai[0], smooth.ai[1], '#dc2626', 'ИИ', state.ai.hp,
+             `${state.ai.weapon} · ${state.ai.hp.toFixed(1)}hp`, state.ai_max_hp);
+  drawEntity(smooth.you[0], smooth.you[1], '#2563eb', 'ТЫ', state.you.hp,
+             `${state.you.weapon} · ${state.you.hp.toFixed(1)}hp`);
+
+  // connection line when close
+  if (state.distance < 4.5) {
+    const [ax, ay] = toPx(smooth.you[0], smooth.you[1], s);
+    const [bx, by] = toPx(smooth.ai[0], smooth.ai[1], s);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+    ctx.strokeStyle = `rgba(239,68,68,${0.35 * (1 - state.distance / 4.5)})`;
+    ctx.lineWidth = 3; ctx.stroke();
+  }
+
+  // legend
+  ctx.fillStyle = '#7d8fa8';
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Арена 18×18 блоков · вид сверху', 14, 12);
+}
+
+connect();
+requestAnimationFrame(function loop() { draw(); requestAnimationFrame(loop); });
+</script>
+</body>
+</html>

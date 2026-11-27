@@ -1,0 +1,45 @@
+{
+  "theme_id": 0,
+  "theme": "Woodland Cottage",
+  "choices": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "design": {
+    "cozy square": 0,
+    "oak and cobble": 0,
+    "steep gable": 0,
+    "symmetric casements": 0,
+    "central porch": 0,
+    "chimney": 0,
+    "cottage garden": 0
+  },
+  "rotation": 0,
+  "lot_scale": 2,
+  "season": 2,
+  "reward": 0.9809133059827108,
+  "checkpoint": "models/builder_6m/builder_606000_episodes",
+  "structure": "neural voxel mansion",
+  "block_generator": "models/builder/voxel_mansion_net.pt",
+  "generation_method": "the voxel network predicts a block token independently for every grid coordinate; no mansion renderer is called at inference",
+  "origin": [
+    100,
+    64,
+    100
+  ],
+  "block_count": 3250,
+  "block_histogram": {
+    "minecraft:cobblestone": 378,
+    "minecraft:oak_door": 5,
+    "minecraft:oak_fence": 1,
+    "minecraft:oak_leaves": 182,
+    "minecraft:oak_log": 23,
+    "minecraft:oak_planks": 1384,
+    "minecraft:spruce_planks": 1277
+  }
+}

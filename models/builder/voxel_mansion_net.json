@@ -1,0 +1,337 @@
+{
+  "block_names": [
+    "minecraft:air",
+    "minecraft:acacia_door[facing=south,half=lower,hinge=left,open=false,powered=false]",
+    "minecraft:acacia_door[facing=south,half=lower,hinge=right,open=false,powered=false]",
+    "minecraft:acacia_door[facing=south,half=upper,hinge=left,open=false,powered=false]",
+    "minecraft:acacia_door[facing=south,half=upper,hinge=right,open=false,powered=false]",
+    "minecraft:acacia_leaves",
+    "minecraft:acacia_log",
+    "minecraft:acacia_planks",
+    "minecraft:birch_door[facing=south,half=lower,hinge=left,open=false,powered=false]",
+    "minecraft:birch_door[facing=south,half=lower,hinge=right,open=false,powered=false]",
+    "minecraft:birch_door[facing=south,half=upper,hinge=left,open=false,powered=false]",
+    "minecraft:birch_door[facing=south,half=upper,hinge=right,open=false,powered=false]",
+    "minecraft:birch_leaves",
+    "minecraft:birch_log",
+    "minecraft:birch_planks",
+    "minecraft:bricks",
+    "minecraft:cobblestone",
+    "minecraft:cut_sandstone",
+    "minecraft:cyan_stained_glass_pane",
+    "minecraft:dark_oak_door[facing=south,half=lower,hinge=left,open=false,powered=false]",
+    "minecraft:dark_oak_door[facing=south,half=lower,hinge=right,open=false,powered=false]",
+    "minecraft:dark_oak_door[facing=south,half=upper,hinge=left,open=false,powered=false]",
+    "minecraft:dark_oak_door[facing=south,half=upper,hinge=right,open=false,powered=false]",
+    "minecraft:dark_oak_leaves",
+    "minecraft:dark_oak_log",
+    "minecraft:dark_oak_planks",
+    "minecraft:dark_prismarine",
+    "minecraft:glass_pane",
+    "minecraft:lantern[hanging=false,waterlogged=false]",
+    "minecraft:light_blue_stained_glass_pane",
+    "minecraft:nether_bricks",
+    "minecraft:oak_door[facing=south,half=lower,hinge=left,open=false,powered=false]",
+    "minecraft:oak_door[facing=south,half=lower,hinge=right,open=false,powered=false]",
+    "minecraft:oak_door[facing=south,half=upper,hinge=left,open=false,powered=false]",
+    "minecraft:oak_door[facing=south,half=upper,hinge=right,open=false,powered=false]",
+    "minecraft:oak_fence",
+    "minecraft:oak_leaves",
+    "minecraft:oak_log",
+    "minecraft:oak_planks",
+    "minecraft:orange_stained_glass_pane",
+    "minecraft:orange_terracotta",
+    "minecraft:polished_blackstone_bricks",
+    "minecraft:prismarine_bricks",
+    "minecraft:red_sandstone",
+    "minecraft:red_stained_glass_pane",
+    "minecraft:sandstone",
+    "minecraft:spruce_door[facing=south,half=lower,hinge=left,open=false,powered=false]",
+    "minecraft:spruce_door[facing=south,half=lower,hinge=right,open=false,powered=false]",
+    "minecraft:spruce_door[facing=south,half=upper,hinge=left,open=false,powered=false]",
+    "minecraft:spruce_door[facing=south,half=upper,hinge=right,open=false,powered=false]",
+    "minecraft:spruce_leaves",
+    "minecraft:spruce_log",
+    "minecraft:spruce_planks",
+    "minecraft:stone_bricks",
+    "minecraft:warped_door[facing=south,half=lower,hinge=left,open=false,powered=false]",
+    "minecraft:warped_door[facing=south,half=lower,hinge=right,open=false,powered=false]",
+    "minecraft:warped_door[facing=south,half=upper,hinge=left,open=false,powered=false]",
+    "minecraft:warped_door[facing=south,half=upper,hinge=right,open=false,powered=false]",
+    "minecraft:warped_planks",
+    "minecraft:warped_stem",
+    "minecraft:warped_wart_block",
+    "minecraft:water",
+    "minecraft:white_stained_glass_pane",
+    "minecraft:yellow_stained_glass_pane"
+  ],
+  "hidden_sizes": [
+    128,
+    128
+  ],
+  "grid_bounds": {
+    "x_min": -15,
+    "y_min": 0,
+    "z_min": -13,
+    "x_size": 31,
+    "y_size": 17,
+    "z_size": 31
+  },
+  "condition_size": 60,
+  "input_size": 63,
+  "training_examples": 96,
+  "epochs": 30,
+  "seed": 20261126,
+  "policy_checkpoint": "models/builder/builder_500000_episodes",
+  "training_source": "procedural mansion teacher plans; inference predicts every block cell directly",
+  "validation_loss": 0.24094299972057343,
+  "full_block_counts": [
+    1256266,
+    22,
+    14,
+    22,
+    14,
+    3860,
+    3774,
+    3830,
+    5,
+    2,
+    5,
+    2,
+    880,
+    779,
+    6700,
+    7590,
+    6709,
+    13022,
+    1568,
+    4,
+    1,
+    4,
+    1,
+    730,
+    630,
+    5391,
+    9708,
+    1985,
+    576,
+    210,
+    4658,
+    21,
+    1,
+    21,
+    1,
+    576,
+    3840,
+    3313,
+    26603,
+    260,
+    2884,
+    1515,
+    25799,
+    23814,
+    213,
+    16017,
+    18,
+    1,
+    18,
+    1,
+    3380,
+    2715,
+    47413,
+    35492,
+    26,
+    11,
+    26,
+    11,
+    34366,
+    4615,
+    4820,
+    180,
+    314,
+    1105
+  ],
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.3549890572635026,
+      "validation_loss": 0.965042233467102,
+      "validation_accuracy_balanced_samples": 0.6511546969413757
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.8028781841007563,
+      "validation_loss": 0.8236932754516602,
+      "validation_accuracy_balanced_samples": 0.696899950504303
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.7120816439676744,
+      "validation_loss": 0.7621414661407471,
+      "validation_accuracy_balanced_samples": 0.7322728633880615
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.6610905745854745,
+      "validation_loss": 0.6987939476966858,
+      "validation_accuracy_balanced_samples": 0.7529361248016357
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.6043693004176021,
+      "validation_loss": 0.625242292881012,
+      "validation_accuracy_balanced_samples": 0.7734830975532532
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.5506476995606835,
+      "validation_loss": 0.5740367770195007,
+      "validation_accuracy_balanced_samples": 0.7852275371551514
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.509859343417562,
+      "validation_loss": 0.5385555028915405,
+      "validation_accuracy_balanced_samples": 0.8010302782058716
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.47766038152174306,
+      "validation_loss": 0.5007472634315491,
+      "validation_accuracy_balanced_samples": 0.8079257607460022
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.44977958786946076,
+      "validation_loss": 0.46618029475212097,
+      "validation_accuracy_balanced_samples": 0.8176236748695374
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.4217800637707114,
+      "validation_loss": 0.44113731384277344,
+      "validation_accuracy_balanced_samples": 0.8307402729988098
+    },
+    {
+      "epoch": 11,
+      "train_loss": 0.3975106737074944,
+      "validation_loss": 0.41820135712623596,
+      "validation_accuracy_balanced_samples": 0.842298686504364
+    },
+    {
+      "epoch": 12,
+      "train_loss": 0.37897556826758844,
+      "validation_loss": 0.4011456370353699,
+      "validation_accuracy_balanced_samples": 0.8462638854980469
+    },
+    {
+      "epoch": 13,
+      "train_loss": 0.3642246056204805,
+      "validation_loss": 0.3855593800544739,
+      "validation_accuracy_balanced_samples": 0.8487290143966675
+    },
+    {
+      "epoch": 14,
+      "train_loss": 0.3512441258017833,
+      "validation_loss": 0.37684276700019836,
+      "validation_accuracy_balanced_samples": 0.8545198440551758
+    },
+    {
+      "epoch": 15,
+      "train_loss": 0.33917962716749084,
+      "validation_loss": 0.3601663410663605,
+      "validation_accuracy_balanced_samples": 0.8611246943473816
+    },
+    {
+      "epoch": 16,
+      "train_loss": 0.328056421632377,
+      "validation_loss": 0.35015445947647095,
+      "validation_accuracy_balanced_samples": 0.8642410039901733
+    },
+    {
+      "epoch": 17,
+      "train_loss": 0.3176593974662515,
+      "validation_loss": 0.33959218859672546,
+      "validation_accuracy_balanced_samples": 0.868322491645813
+    },
+    {
+      "epoch": 18,
+      "train_loss": 0.30816815643069834,
+      "validation_loss": 0.33388766646385193,
+      "validation_accuracy_balanced_samples": 0.8708691000938416
+    },
+    {
+      "epoch": 19,
+      "train_loss": 0.2968754360022453,
+      "validation_loss": 0.32025548815727234,
+      "validation_accuracy_balanced_samples": 0.8744040727615356
+    },
+    {
+      "epoch": 20,
+      "train_loss": 0.2871046183057703,
+      "validation_loss": 0.3111131489276886,
+      "validation_accuracy_balanced_samples": 0.8803111910820007
+    },
+    {
+      "epoch": 21,
+      "train_loss": 0.27780892431306153,
+      "validation_loss": 0.29916560649871826,
+      "validation_accuracy_balanced_samples": 0.883729875087738
+    },
+    {
+      "epoch": 22,
+      "train_loss": 0.2697300479675715,
+      "validation_loss": 0.2902758717536926,
+      "validation_accuracy_balanced_samples": 0.8876602053642273
+    },
+    {
+      "epoch": 23,
+      "train_loss": 0.2619139594742312,
+      "validation_loss": 0.2878755033016205,
+      "validation_accuracy_balanced_samples": 0.8887416124343872
+    },
+    {
+      "epoch": 24,
+      "train_loss": 0.25459118764131117,
+      "validation_loss": 0.27207714319229126,
+      "validation_accuracy_balanced_samples": 0.8954510688781738
+    },
+    {
+      "epoch": 25,
+      "train_loss": 0.24784731506728208,
+      "validation_loss": 0.27174440026283264,
+      "validation_accuracy_balanced_samples": 0.8939277529716492
+    },
+    {
+      "epoch": 26,
+      "train_loss": 0.24135201553312632,
+      "validation_loss": 0.2656118869781494,
+      "validation_accuracy_balanced_samples": 0.8982418179512024
+    },
+    {
+      "epoch": 27,
+      "train_loss": 0.23451125163298386,
+      "validation_loss": 0.25622323155403137,
+      "validation_accuracy_balanced_samples": 0.9023814797401428
+    },
+    {
+      "epoch": 28,
+      "train_loss": 0.22809589360482418,
+      "validation_loss": 0.24840790033340454,
+      "validation_accuracy_balanced_samples": 0.9032535552978516
+    },
+    {
+      "epoch": 29,
+      "train_loss": 0.22238068243202108,
+      "validation_loss": 0.24582907557487488,
+      "validation_accuracy_balanced_samples": 0.9051024317741394
+    },
+    {
+      "epoch": 30,
+      "train_loss": 0.2171186452301649,
+      "validation_loss": 0.24094299972057343,
+      "validation_accuracy_balanced_samples": 0.9064396619796753
+    }
+  ],
+  "elapsed_seconds": 355.1702554939984
+}
