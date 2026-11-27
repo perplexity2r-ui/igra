@@ -1,0 +1,76 @@
+{
+  "model": "models/builder/builder_500000_episodes",
+  "seed": 20261125,
+  "reward_note": "Scores are the handcrafted design-quality proxy, not human or screenshot ratings.",
+  "policy": {
+    "episodes": 400,
+    "mean_quality": 0.9399148932950837,
+    "per_theme": {
+      "cottage": {
+        "episodes": 100,
+        "mean_quality": 0.9809133059827105,
+        "min_quality": 0.9809133059827108,
+        "max_quality": 0.9809133059827108,
+        "first_plan_choices": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "alpine": {
+        "episodes": 100,
+        "mean_quality": 0.9646237780366625,
+        "min_quality": 0.9646237780366625,
+        "max_quality": 0.9646237780366625,
+        "first_plan_choices": [
+          1,
+          1,
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      },
+      "desert": {
+        "episodes": 100,
+        "mean_quality": 0.8910598269530702,
+        "min_quality": 0.8910598269530704,
+        "max_quality": 0.8910598269530704,
+        "first_plan_choices": [
+          2,
+          2,
+          6,
+          0,
+          6,
+          6,
+          2
+        ]
+      },
+      "fantasy": {
+        "episodes": 100,
+        "mean_quality": 0.9230626622078916,
+        "min_quality": 0.9230626622078911,
+        "max_quality": 0.9230626622078911,
+        "first_plan_choices": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          3
+        ]
+      }
+    }
+  },
+  "uniform_random_baseline": {
+    "episodes": 50000,
+    "mean_quality": 0.7678854485233955
+  },
+  "proxy_gain": 0.17202944477168824
+}

@@ -1,0 +1,28 @@
+{
+  "theme_id": 1,
+  "theme": "Alpine Lodge",
+  "choices": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    1,
+    1
+  ],
+  "design": {
+    "alpine chalet": 1,
+    "spruce and stone": 1,
+    "steep gable": 0,
+    "symmetric casements": 0,
+    "central porch": 0,
+    "dormer": 1,
+    "pine grove": 1
+  },
+  "rotation": 0,
+  "lot_scale": 1,
+  "season": null,
+  "reward": 0.9646237780366625,
+  "checkpoint": "models/builder/builder_500000_episodes",
+  "block_count": 716
+}

@@ -28,5 +28,10 @@ world_nether/session.lock
 world_the_end/session.lock
 logs/*.log.gz
 
-# PRO training checkpoints
+# PRO and builder training checkpoints
 models/pro_checkpoints/
+models/builder/checkpoints/
+models/builder_6m/checkpoints/
+
+# Intentionally shipped PvP release artifact
+!mods/pvp/aipilot-1.16.5.jar

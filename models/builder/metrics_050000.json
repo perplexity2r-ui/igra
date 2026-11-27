@@ -1,0 +1,9 @@
+{
+  "target_episodes": 50000,
+  "completed_episodes": 50000,
+  "mean_reward": 4.9479015872400005,
+  "mean_quality": 0.9324900146057128,
+  "recent_mean_reward_100": 4.98898496,
+  "recent_mean_quality_100": 0.939909131088711,
+  "elapsed_seconds": 255.73078177999923
+}
