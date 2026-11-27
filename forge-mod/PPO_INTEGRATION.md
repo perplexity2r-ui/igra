@@ -2,7 +2,7 @@
 
 ## Model and runtime
 
-The runtime is being extended to a 50-feature one-versus-many actor. The new inputs
+The packaged runtime now uses a 50-feature one-versus-many actor. The new inputs
 retain the terrain actor's 44 features and the four crowd summaries, then append the
 nearest non-target opponent's relative X/Z offsets. The actor is warm-started from the
 best-tested 48-feature checkpoint,

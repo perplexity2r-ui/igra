@@ -19,8 +19,8 @@ The corrected AoE 50k run itself completed exactly 50,000 fights; it was initial
 
 ## Current iteration
 
-A new 50,000-fight run (seed `20261206`) is being started from a shape-50 warm-start
-seed. It adds the nearest non-target opponent's relative X/Z offsets to the existing
+A new exact 50,000-fight run (seed `20261206`) is in progress from a shape-50
+warm-start seed. It adds the nearest non-target opponent's relative X/Z offsets to the existing
 48 features. The seed's new input weights are zero, exactly preserving the prior best
 policy's logits; training uses the standard skill/aggression curriculum. Independent
 evaluation is pending.

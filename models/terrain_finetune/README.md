@@ -46,6 +46,7 @@ with max logit error `2.8610229e-06` and zero action mismatches. Resource SHA-25
 `5e8a7fec7a5676fe9c727afd177915e34c5d8a5db881e22b8077c3da8083f2ab`
 
 The 50-feature training run is in progress; after it finishes, the final actor must be
-re-exported and verified before treating it as a replacement. Live Minecraft
-multi-opponent performance remains unverified, and Python explosive splash still
-differs from Forge runtime behavior.
+re-exported and verified before treating it as a replacement. GitHub Actions built
+both ForgeGradle 5 and 6 variants, and the published JAR embeds these same seed bytes.
+Live Minecraft multi-opponent performance remains unverified, and Python explosive
+splash still differs from Forge runtime behavior.
