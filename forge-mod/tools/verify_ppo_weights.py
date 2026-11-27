@@ -17,7 +17,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path,
-                        default=root / "models/terrain_finetune/pvp_ppo_terrain_10k.zip")
+                        default=root / "models/terrain_finetune/pvp_ppo_terrain_aggressive_50k.zip")
     parser.add_argument(
         "--weights",
         type=Path,

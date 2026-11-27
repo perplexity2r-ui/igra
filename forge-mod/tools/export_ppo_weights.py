@@ -28,7 +28,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=Path,
-        default=root / "models" / "terrain_finetune" / "pvp_ppo_terrain_10k.zip",
+        default=root / "models" / "terrain_finetune" / "pvp_ppo_terrain_aggressive_50k.zip",
         help="Stable-Baselines3 PPO .zip model",
     )
     parser.add_argument(

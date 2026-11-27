@@ -75,6 +75,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=2024)
     p.add_argument("--terrain-mix", type=float, default=0.0,
                     help="share (0..1) of fights using walls, pits, hills, or mixed terrain")
+    p.add_argument("--player-aggression", type=float, default=0.0,
+                    help="0..1 shaping that rewards closing to melee and tolerates damage trades")
     p.add_argument("--save", default="models/pvp_ppo_pro_500k")
     p.add_argument("--load", default=None)
     p.add_argument("--fresh", action="store_true", help="train from random initialization")
@@ -136,9 +138,12 @@ def main() -> None:
         raise SystemExit("--fights must be positive")
     if not 0.0 <= args.terrain_mix <= 1.0:
         raise SystemExit("--terrain-mix must be between 0 and 1")
+    if not 0.0 <= args.player_aggression <= 1.0:
+        raise SystemExit("--player-aggression must be between 0 and 1")
     terrain_obs = args.terrain_mix > 0.0
     env = ProPvPVecEnv(args.n_envs, seed=args.seed,
                        terrain_mix=args.terrain_mix, terrain_obs=terrain_obs)
+    env.set_player_aggression(args.player_aggression)
     if args.exact_fights:
         env.set_fight_limit(args.fights)
     env.set_enemy_skill(0.30)
@@ -170,8 +175,8 @@ def main() -> None:
 
     print(
         f"PRO training: target {fight_target:,} fights | {args.n_envs} parallel arenas | "
-        f"terrain share={args.terrain_mix:.0%} | exact={args.exact_fights} | "
-        f"{steps_per_rollout} steps/rollout | checkpoint -> {ckpt_dir}",
+        f"terrain share={args.terrain_mix:.0%} | player aggression={args.player_aggression:.0%} | "
+        f"exact={args.exact_fights} | {steps_per_rollout} steps/rollout | checkpoint -> {ckpt_dir}",
         flush=True,
     )
 
@@ -220,6 +225,7 @@ def main() -> None:
                 "win_rate_recent_200": round(metrics.win_rate, 4),
                 "enemy_skill": round(skill, 3),
                 "terrain_mix": args.terrain_mix,
+                "player_aggression": args.player_aggression,
                 "terrain_blocked_steps": env.terrain_blocked,
                 "pit_blocked_steps": env.pit_blocked,
                 "timesteps": total_timesteps,
@@ -252,6 +258,7 @@ def main() -> None:
         "wins": metrics.wins, "losses": metrics.losses, "draws": metrics.draws,
         "win_rate_recent_200": round(metrics.win_rate, 4),
         "terrain_mix": args.terrain_mix,
+        "player_aggression": args.player_aggression,
         "terrain_blocked_steps": env.terrain_blocked,
         "pit_blocked_steps": env.pit_blocked,
         "timesteps": total_timesteps,

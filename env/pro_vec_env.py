@@ -218,7 +218,8 @@ class ProArena:
         self._human_broke = np.zeros(self.n, bool)     # pve: human escaped an AI chain
         self._human_countered = np.zeros(self.n, bool)  # pve: human landed a counter
         self.pve = False
-        self.e_aggression = 0.0   # 0 = normal pro, 1 = relentless combo pressure
+        self.e_aggression = 0.0   # scripted opponent pressure
+        self.player_aggression = 0.0  # learner pursuit/tradeoff reward shaping (0..1)
         self.combo_curriculum = 0.0  # share of fights that start mid-chain
         self.reset(np.ones(self.n, bool))
 
@@ -368,6 +369,10 @@ class ProArena:
     def set_aggression(self, value: float) -> None:
         """0..1 — how relentlessly the scripted pro chases combo chains."""
         self.e_aggression = float(np.clip(value, 0.0, 1.0))
+
+    def set_player_aggression(self, value: float) -> None:
+        """0..1 — reward pressure for the learner to close distance and trade damage."""
+        self.player_aggression = float(np.clip(value, 0.0, 1.0))
 
     def set_ai_action(self, action) -> None:
         """Queue the action the AI opponent should execute on the next step."""
@@ -1191,6 +1196,9 @@ class ProArena:
 
         vec = E.pos - L.pos
         dist = np.linalg.norm(vec, axis=1)
+        initial_dist = dist.copy()
+        initial_learner_pos = L.pos.copy()
+        initial_enemy_pos = E.pos.copy()
         fwd = vec / np.maximum(dist, 1e-6)[:, None]
         right = np.stack([-fwd[:, 1], fwd[:, 0]], 1)
 
@@ -1545,6 +1553,12 @@ class ProArena:
         L.vel = np.where(terrain_blocked[:, None], L.vel * 0.15, L.vel)
         flags["terrain_blocked"] |= terrain_blocked
         flags["pit_blocked"] |= pit_blocked
+        target_dir_start = (initial_enemy_pos - initial_learner_pos) / np.maximum(
+            initial_dist[:, None], 1e-6
+        )
+        aggressive_approach = np.sum(
+            (L.pos - initial_learner_pos) * target_dir_start, axis=1
+        )
 
         # ---- enemy decides & moves
         if self.pve and self._human_action is not None:
@@ -1658,7 +1672,8 @@ class ProArena:
 
         # ---- rewards
         reward = np.full(n, -0.01, np.float32)
-        reward += dmg_dealt * 2.5 - dmg_taken * 1.4 + healed * 0.4
+        damage_penalty = 1.4 - 0.25 * self.player_aggression
+        reward += dmg_dealt * 2.5 - dmg_taken * damage_penalty + healed * 0.4
         reward += np.where(flags["shield_broken"], 4.0, 0.0)
         reward += np.where(flags["blocked_hit"], 2.5, 0.0)
         reward += np.where(flags["trapped_enemy"], 3.0, 0.0)
@@ -1682,6 +1697,9 @@ class ProArena:
         prev_dist = brain["dist"]
         new_dist = re_dist
         reward += np.where(new_dist > 3.0, np.clip((prev_dist - new_dist) * 0.05, -0.05, 0.05), 0.0)
+        if self.player_aggression > 0.0:
+            approach_bonus = np.clip(aggressive_approach, -0.75, 0.75) * 0.60
+            reward += self.player_aggression * np.where(initial_dist > REACH, approach_bonus, 0.0)
         reward += np.where(enemy_dead, 100.0, 0.0)
         reward -= np.where(learner_dead, 100.0, 0.0)
         reward = reward.astype(np.float32)
@@ -1872,6 +1890,9 @@ class ProPvPVecEnv(VecEnv):
 
     def set_aggression(self, value: float) -> None:
         self.core.set_aggression(value)
+
+    def set_player_aggression(self, value: float) -> None:
+        self.core.set_player_aggression(value)
 
     def set_combo_curriculum(self, share: float) -> None:
         self.core.set_combo_curriculum(share)

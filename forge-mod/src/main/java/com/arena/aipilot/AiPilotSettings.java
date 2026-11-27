@@ -14,10 +14,10 @@ public final class AiPilotSettings {
     private static final Path FILE = FMLPaths.CONFIGDIR.get().resolve("aipilot-style.properties");
     private static final Properties PROPERTIES = new Properties();
 
-    private static float aggression = 0.78F;
-    private static float pursuit = 0.90F;
-    private static float strafing = 0.55F;
-    private static float caution = 0.28F;
+    private static float aggression = 1.0F;
+    private static float pursuit = 1.0F;
+    private static float strafing = 0.65F;
+    private static float caution = 0.0F;
 
     static {
         load();
