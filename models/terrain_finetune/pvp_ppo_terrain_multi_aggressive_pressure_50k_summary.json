@@ -1,0 +1,111 @@
+{
+  "target_fights": 50000,
+  "seed": 20261207,
+  "warm_start": "models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_seed.zip",
+  "max_difficulty": false,
+  "learning_rate": 0.0003,
+  "entropy_coefficient": 0.02,
+  "opponent_cap_ramp_fraction": 0.25,
+  "fights": 50000,
+  "wins": 5320,
+  "losses": 44588,
+  "draws": 92,
+  "win_rate_recent_200": 0.12,
+  "opponents_min": 3,
+  "opponents_max": 8,
+  "opponents_average": 5.896,
+  "opponents_histogram": [
+    0,
+    0,
+    0,
+    5099,
+    6873,
+    8065,
+    8987,
+    10040,
+    10936
+  ],
+  "enemy_kills": 111401,
+  "aoe_enemy_hits": 72727,
+  "aoe_enemy_kills": 448,
+  "aoe_enemy_damage": 212019.18,
+  "terrain_mix": 1.0,
+  "player_aggression": 1.0,
+  "timesteps": 6422528,
+  "elapsed_sec": 1797.3,
+  "combos": {
+    "breaks": 4222,
+    "counters": 503,
+    "hits": 7394
+  },
+  "techniques": {
+    "block_barricade": 6562,
+    "buff_potion": 21293,
+    "cobweb_trap": 18143,
+    "combo_break": 4222,
+    "combo_counter": 503,
+    "end_crystal": 15276,
+    "ender_pearl": 20833,
+    "golden_apple": 61665,
+    "instant_heal": 77093,
+    "lava_trap": 10880,
+    "obsidian_cage": 77890,
+    "pearl_crystal": 8908,
+    "pillar_jump": 68903,
+    "ranged": 47740,
+    "respawn_anchor": 22392,
+    "shield_block": 0,
+    "tnt_minecart": 37983,
+    "water_bucket": 9272,
+    "wtap_combo": 14069
+  },
+  "terrain_blocked_steps": 2667757,
+  "pit_blocked_steps": 101503,
+  "other_enemy_terrain_blocked_steps": 3730396,
+  "other_enemy_pit_blocked_steps": 377732,
+  "independent_evaluation": {
+    "seed": 6061,
+    "episodes_per_group": 200,
+    "enemy_skill": 1.0,
+    "terrain_mix": 1.0,
+    "deterministic": true,
+    "groups": {
+      "3": {
+        "wins": 63,
+        "losses": 134,
+        "draws": 3,
+        "win_rate": 0.315
+      },
+      "4": {
+        "wins": 34,
+        "losses": 165,
+        "draws": 1,
+        "win_rate": 0.17
+      },
+      "5": {
+        "wins": 23,
+        "losses": 177,
+        "draws": 0,
+        "win_rate": 0.115
+      },
+      "6": {
+        "wins": 9,
+        "losses": 191,
+        "draws": 0,
+        "win_rate": 0.045
+      },
+      "7": {
+        "wins": 2,
+        "losses": 198,
+        "draws": 0,
+        "win_rate": 0.01
+      },
+      "8": {
+        "wins": 1,
+        "losses": 199,
+        "draws": 0,
+        "win_rate": 0.005
+      }
+    }
+  }
+}

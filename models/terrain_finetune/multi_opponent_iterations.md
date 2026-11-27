@@ -14,14 +14,14 @@ All evaluation rows below use deterministic policy inference, enemy skill `1.0`,
 | Max-difficulty 50k (seed 20261205; lr 1e-4) | 4,468 / 45,447 / 85 | 5.910 | 54 (27%); 26 (13%); 10 (5%); 6 (3%); 5 (2.5%); 0 |
 | Threat-position 50k (seed 20261206; six crowd/threat features) | 5,247 / 44,649 / 104 | 5.896 | 56 (28%); 31 (15.5%); 10 (5%); 2 (1%); 0; 1 (0.5%) |
 
-The best tested checkpoint remains `pvp_ppo_terrain_multi_aggressive_aoe_50k.zip`. It does **not** win consistently: its win rates fall from 29% against three opponents to 0.5% against eight. The 20261204 weighted run gained against four opponents but fell behind at five and above. Full-difficulty training and the 50-feature threat-position actor both failed to improve the overall 3–8 benchmark; the threat-position model won 0/200 against seven. None of these runs supports a claim that the bot does not lose.
+The 48-feature AoE checkpoint remains the baseline and is stronger against groups of six and seven. The 52-feature crowd-bearing model recorded 132 wins across the six 200-fight groups versus 127 for AoE: it improved groups 3–5, regressed against 6–7, and tied at 8. **Neither model wins consistently across all group sizes.** The training win rate is not a substitute for the fixed independent benchmark.
 
-The corrected AoE 50k run itself completed exactly 50,000 fights; it was initialized from the separate 10k diagnostic model. Every subsequent 50k iteration also used an exact completed-fight quota. The `*_summary.json` files record training histograms and conditions; the best checkpoint's JSON includes full independent evaluation counts.
+Every refinement used an exact completed-fight quota of 50,000. The `*_summary.json` files record training histograms and conditions; the threat-position and crowd-bearing summaries also include their independent evaluation counts.
 
-## Current iteration
+## Completed iteration: crowd-bearing 52-feature
 
-A new exact 50,000-fight run (seed `20261207`) is in progress from a 52-input warm-start
-seed. It adds the weighted mean direction of the non-target crowd alongside the
-nearest non-target opponent's relative X/Z offsets and the existing four crowd summaries. The two new input weights are zero,
-preserving the best checkpoint's logits at initialization; training uses the standard
-difficulty curriculum. Independent evaluation is pending.
+Seed `20261207`, warm-started from the 48-feature AoE checkpoint through the zero-initialized 52-feature seed, completed exactly 50,000 fights in 1,797.3 seconds. It used the standard difficulty curriculum, 128 arenas, and player aggression 1.0. Training W/L/D was **5,320 / 44,588 / 92** (recent-200 win rate 12.0%). The independent results are in `pvp_ppo_terrain_multi_aggressive_pressure_50k_summary.json`; the trained actor was exported and verified against 2,048 observations.
+
+## Next iteration
+
+An exact 50,000-fight 52-feature full-difficulty run (seed `20261208`) is now in progress, warm-started from `pvp_ppo_terrain_multi_aggressive_pressure_50k.zip` at learning rate `1e-4`. Enemy skill/aggression and combo curriculum are at maximum from the start. The output checkpoint is `pvp_ppo_terrain_multi_aggressive_pressure_maxdiff_50k.zip`. The fixed seed-6061 evaluation protocol remains unchanged; no run counts as success without reliable independent wins against every group size from three through eight.

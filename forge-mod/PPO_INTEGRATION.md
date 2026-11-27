@@ -2,17 +2,19 @@
 
 ## Model and runtime
 
-The packaged runtime now uses a 52-feature one-versus-many actor. It retains the
-terrain actor's 44 features and four crowd summaries, then appends the nearest
-non-target opponent's relative X/Z offsets and a weighted crowd-bearing vector. The
-zero-initialized appended weights preserve the best-tested 48-feature checkpoint's
-logits exactly until training learns to use these sensors. The architecture is
-`52 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`.
+The exported actor has 52 features: the terrain actor's 44 inputs, four crowd
+summaries, the nearest non-target opponent's relative X/Z offsets, and a weighted
+crowd-bearing vector. The four added input columns were zero-initialized in the
+warm-start seed, preserving the best 48-feature actor's logits at initialization; the
+final 50,000-fight actor has since learned their values. The architecture is
+`52 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`. Forge CI must rebuild
+the JAR after the final weight export.
 
-The previous 50-feature threat-position continuation was independently evaluated but
-did not improve the multi-opponent benchmark. The current 52-feature run is still in
-training; neither new input schema has been shown to improve live Minecraft group
-combat.
+The 52-feature run slightly improved wins against groups of three through five, but
+lost ground against six and seven and tied at eight versus the AoE baseline. No stable
+multi-opponent win rate has been demonstrated, and live Minecraft group combat remains
+unverified.
+
 `PpoPolicy` reads `src/main/resources/com/arena/aipilot/ppo_policy.bin` and selects
 `argmax(logits)` in Java. Python, PyTorch, Stable-Baselines3, and network access are
 not needed in the game. The client runs one inference every two Minecraft ticks
@@ -21,8 +23,10 @@ not needed in the game. The client runs one inference every two Minecraft ticks
 To regenerate and verify the embedded weights after updating the checkpoint:
 
 ```bash
-.venv/bin/python forge-mod/tools/export_ppo_weights.py
-.venv/bin/python forge-mod/tools/verify_ppo_weights.py
+.venv/bin/python forge-mod/tools/export_ppo_weights.py \\
+  --model models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_50k.zip
+.venv/bin/python forge-mod/tools/verify_ppo_weights.py \\
+  --model models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_50k.zip
 ```
 
 The verifier compares all 30 logits against Stable-Baselines3 on seeded
@@ -135,7 +139,8 @@ terminal penalty for the learner's death than for ordinary damage.
   --model models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_50k.zip
 for opponents in 3 4 5 6 7 8; do
   .venv/bin/python play_multi.py --model models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_50k.zip \\
-    --episodes 200 --min-opponents "$opponents" --opponent-cap "$opponents"
+    --episodes 200 --min-opponents "$opponents" --opponent-cap "$opponents" \\
+    --skill 1.0 --terrain-mix 1.0 --seed 6061
 done
 ```
 
@@ -152,13 +157,17 @@ per group:
 | 7 | 4 | 196 | 0 | 2.0% |
 | 8 | 1 | 199 | 0 | 0.5% |
 
-This is not stable winning and does not meet the no-loss goal. Six further exact
+This is not stable winning and does not meet the no-loss goal. Six later exact
 50,000-fight refinements (hard-crowd sampling, target focus, win/death shaping,
 weighted groups, full-difficulty training, and 50-feature threat positions) failed to
-improve all group sizes. The threat-position actor won 56/200, 31/200, 10/200, 2/200,
-0/200, and 1/200 against groups of three through eight. The new 52-feature crowd-bearing
-run is still in progress. Forge runtime group combat remains unverified; Python and
-packaged-actor checks are not an in-game multiplayer test.
+improve all sizes. The latest 52-feature crowd-bearing model won 63/200, 34/200,
+23/200, 9/200, 2/200, and 1/200 against groups of three through eight. It raised the
+aggregate by five wins over the AoE baseline but regressed against six and seven. The
+full iteration table and machine-readable summary are in
+`models/terrain_finetune/multi_opponent_iterations.md` and
+`pvp_ppo_terrain_multi_aggressive_pressure_50k_summary.json`. Forge runtime group
+combat remains unverified; Python and packaged-actor checks are not an in-game
+multiplayer test.
 ## Action compatibility
 
 The policy still chooses an integer in `Discrete(30)`; Java maps that ID to the
