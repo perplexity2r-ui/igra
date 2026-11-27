@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 from stable_baselines3 import PPO
 
-OBS_DIM = 48
+OBS_DIM = 50
 HIDDEN_1 = 192
 HIDDEN_2 = 192
 ACTION_DIM = 30
@@ -28,7 +28,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=Path,
-        default=root / "models" / "terrain_finetune" / "pvp_ppo_terrain_multi_aggressive_aoe_50k.zip",
+        default=root / "models" / "terrain_finetune" / "pvp_ppo_terrain_multi_aggressive_threat_50k.zip",
         help="Stable-Baselines3 PPO .zip model",
     )
     parser.add_argument(

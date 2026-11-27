@@ -2,11 +2,15 @@
 
 ## Model and runtime
 
-The current Forge build embeds the best-tested deterministic 48-feature actor
-fine-tuned for one-versus-many fights from
-`models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_50k.zip`.
-It retains the terrain actor's 44 inputs and appends four crowd-context sensors; the
-architecture is `48 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`.
+The runtime is being extended to a 50-feature one-versus-many actor. The new inputs
+retain the terrain actor's 44 features and the four crowd summaries, then append the
+nearest non-target opponent's relative X/Z offsets. The actor is warm-started from the
+best-tested 48-feature checkpoint,
+`models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_50k.zip`; its zero-initialized
+new input weights preserve that policy until training learns to use the threat sensors.
+The architecture is `50 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`. The
+50-feature 50,000-fight continuation is a candidate, not yet an independently tested
+replacement for the 48-feature checkpoint.
 `PpoPolicy` reads `src/main/resources/com/arena/aipilot/ppo_policy.bin` and selects
 `argmax(logits)` in Java. Python, PyTorch, Stable-Baselines3, and network access are
 not needed in the game. The client runs one inference every two Minecraft ticks
@@ -28,8 +32,8 @@ AI combat is disabled; it does not fall back to the old heuristic.
 
 The legacy source contract is `env/pro_vec_env.py::_obs()` (`Box(-1, 2, (34,), float32)`).
 Terrain fine-tuning appends ten sensors without changing those first 34 indices, for
-`Box(44,)`. `env/multi_opponent.py` appends four crowd sensors for `Box(48,)`; the
-original 44 positions and action IDs remain unchanged. Minecraft has no direct
+`Box(44,)`. `env/multi_opponent.py` appends six crowd/threat sensors for `Box(50,)`;
+the original 44 positions and action IDs remain unchanged. Minecraft has no direct
 counterpart for some simulator-only state, so the bridge uses the following measurements/estimates:
 
 | Index | Training feature | Forge input |
@@ -79,6 +83,8 @@ counterpart for some simulator-only state, so the bridge uses the following meas
 | 45 | opponents within melee reach `/ 8` | count within 3.25 horizontal blocks, clipped to eight |
 | 46 | mean opponent distance `/ 20` | mean horizontal distance of the nearest eight valid targets |
 | 47 | mean opponent health `/ 20` | mean health plus absorption of those targets |
+| 48 | nearest non-target opponent X offset `/ 20` | `(nearestOther.x - player.x) / 20` |
+| 49 | nearest non-target opponent second arena-axis offset `/ 20` | `(nearestOther.z - player.z) / 20` |
 
 On target acquisition, the engine slightly favors weakened nearby targets after
 accounting for distance and visibility. It also runs a short safe-direction search
@@ -117,11 +123,14 @@ terminal penalty for the learner's death than for ordinary damage.
 .venv/bin/python train_multi.py \\
   --fights 50000 --exact-fights --n-envs 128 \\
   --min-opponents 3 --max-opponents 8 --player-aggression 1.0 \\
-  --load models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_10k.zip \\
-  --save models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_50k
+  --load models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_threat_seed.zip \\
+  --save models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_threat_50k
 .venv/bin/python forge-mod/tools/export_ppo_weights.py
 .venv/bin/python forge-mod/tools/verify_ppo_weights.py
-.venv/bin/python play_multi.py --episodes 200 --min-opponents 3 --opponent-cap 8
+for opponents in 3 4 5 6 7 8; do
+  .venv/bin/python play_multi.py --model models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_threat_50k.zip \\
+    --episodes 200 --min-opponents "$opponents" --opponent-cap "$opponents"
+done
 ```
 
 The corrected 50,000-fight run recorded **8,395 wins, 41,447 losses, and 158 draws**.
@@ -137,10 +146,12 @@ per group:
 | 7 | 4 | 196 | 0 | 2.0% |
 | 8 | 1 | 199 | 0 | 0.5% |
 
-This is not stable winning and does not meet the no-loss goal. Three additional exact
-50,000-fight refinements (hard-crowd sampling, target focus, and win/death reward
-shaping) did not improve the best checkpoint enough to change that conclusion. The
-Forge runtime still has not been validated in a live Minecraft group fight; the
+This is not stable winning and does not meet the no-loss goal. Five further exact
+50,000-fight refinements (hard-crowd sampling, target focus, win/death shaping,
+weighted-group continuation, and full-difficulty training) did not improve all group
+sizes; the full-difficulty run won 0/200 against eight. A new 50-feature policy adds
+the nearest non-target opponent's relative position and is being trained separately.
+The Forge runtime still has not been validated in a live Minecraft group fight; the
 Python arena and packaged-actor checks are not an in-game multiplayer test.
 ## Action compatibility
 

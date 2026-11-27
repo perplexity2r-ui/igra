@@ -8,11 +8,11 @@ import java.nio.ByteOrder;
 
 /**
  * Pure-Java deterministic inference for the multi-opponent SB3 PPO actor.
- * The binary resource contains the 48-feature input, two 192-wide tanh layers, and 30 action logits.
+ * The binary resource contains the 50-feature input, two 192-wide tanh layers, and 30 action logits.
  */
 public final class PpoPolicy {
     private static final String RESOURCE = "/com/arena/aipilot/ppo_policy.bin";
-    private static final int OBS = 48;
+    private static final int OBS = 50;
     private static final int HIDDEN_1 = 192;
     private static final int HIDDEN_2 = 192;
     private static final int ACTIONS = 30;

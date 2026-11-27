@@ -46,7 +46,7 @@ public final class AiPilotEngine {
     private static double searchRange = 17.0;
     private static LivingEntity target;
     private static final PpoPolicy ppoPolicy = new PpoPolicy();
-    private static final float[] lastObservation = new float[48];
+    private static final float[] lastObservation = new float[50];
     private static final int[] actionCooldownUntilTick = new int[30];
     private static final double[] terrainSampleDistances = {0.75, 1.5, 2.25, 3.0};
     private static TerrainScan cachedTerrainScan;
@@ -285,16 +285,31 @@ public final class AiPilotEngine {
         );
         if (!nearby.contains(target)) nearby.add(target);
         nearby.sort((a, b) -> Double.compare(horizontalDistance(p, a), horizontalDistance(p, b)));
-        if (nearby.size() > 8) nearby = nearby.subList(0, 8);
+        if (nearby.size() > 8) {
+            java.util.ArrayList<LivingEntity> nearest = new java.util.ArrayList<>(nearby.subList(0, 8));
+            if (!nearest.contains(target)) {
+                nearest.set(nearest.size() - 1, target);
+                nearest.sort((a, b) -> Double.compare(horizontalDistance(p, a), horizontalDistance(p, b)));
+            }
+            nearby = nearest;
+        }
 
         int close = 0;
         double distanceSum = 0.0;
         double healthSum = 0.0;
+        double nearestOtherDistance = Double.MAX_VALUE;
+        double nearestOtherDx = 0.0;
+        double nearestOtherDz = 0.0;
         for (LivingEntity enemy : nearby) {
             double distance = horizontalDistance(p, enemy);
             if (distance <= 3.25) close++;
             distanceSum += distance;
             healthSum += enemy.getHealth() + enemy.getAbsorptionAmount();
+            if (enemy != target && distance < nearestOtherDistance) {
+                nearestOtherDistance = distance;
+                nearestOtherDx = enemy.getX() - p.getX();
+                nearestOtherDz = enemy.getZ() - p.getZ();
+            }
         }
         int count = nearby.size();
         lastObservation[44] = count / 8.0F;
@@ -303,6 +318,8 @@ public final class AiPilotEngine {
                 : clip((float) (distanceSum / count / 20.0), 0.0F, 1.0F);
         lastObservation[47] = count == 0 ? 0.0F
                 : clip((float) (healthSum / count / 20.0), 0.0F, 1.5F);
+        lastObservation[48] = clip((float) (nearestOtherDx / 20.0), -1.0F, 1.0F);
+        lastObservation[49] = clip((float) (nearestOtherDz / 20.0), -1.0F, 1.0F);
     }
 
     private static final class TerrainScan {

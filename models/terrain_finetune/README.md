@@ -23,29 +23,29 @@ The same seeded terrain distribution was used in both runs (21 wall, 26 pit, 29 
 
 ## One-versus-many continuation
 
-The current multi-opponent actor is a 48-feature extension of the terrain policy. Its
-best-tested checkpoint remains
-`pvp_ppo_terrain_multi_aggressive_aoe_50k.zip`, trained for exactly 50,000 fights after
-a separate 10,000-fight AoE diagnostic. At skill 1.0, the independent 200-fight
+The best-tested multi-opponent checkpoint is the 48-feature
+`pvp_ppo_terrain_multi_aggressive_aoe_50k.zip`, trained for exactly 50,000 fights
+after a separate 10,000-fight AoE diagnostic. At skill 1.0, its independent 200-fight
 checks won 58/200 against three opponents, 30/200 against four, 22/200 against five,
 12/200 against six, 4/200 against seven, and 1/200 against eight. This is not stable
-winning. Hard-crowd sampling, target-focus, and win/death reward-shaping refinements
-each ran another exact 50,000 fights but did not produce stable wins. A further
-weighted-group 50,000-fight run won 59/200 against three opponents, 38/200 against
-four, 16/200 against five, 4/200 against six, 4/200 against seven, and 0/200 against
-eight. The full iteration table is in
+winning. Five more exact 50,000-fight refinements (hard-crowd sampling, target focus,
+win/death shaping, weighted-group continuation, and full-difficulty training) failed
+to produce stable wins. A 50-feature threat-aware continuation is now being tested;
+it adds the nearest non-target opponent's relative position to the 44 terrain and four
+crowd features. The full iteration table is in
 [`multi_opponent_iterations.md`](multi_opponent_iterations.md).
 
 ## Forge export and runtime
 
-The current 48-feature actor was exported to
-`forge-mod/src/main/resources/com/arena/aipilot/ppo_policy.bin`.
-`forge-mod/tools/verify_ppo_weights.py --samples 2048` passed: maximum logit error
-`3.8146973e-06`, zero action mismatches. Resource SHA-256:
+The embedded policy has been expanded to 50 inputs from the best-tested 48-feature
+actor. Its two new threat-feature columns are zero in the warm-start seed, so the
+expanded actor preserves the old logits exactly (512-observation comparison: zero max
+delta, zero action mismatches). Export verification on 2,048 50-feature inputs passed
+with max logit error `2.8610229e-06` and zero action mismatches. Resource SHA-256:
 
-`476f41ea115e1c9e73d524ea57b2af86d8d8a6b01c7c3396fefe71f4849c9ee5`
+`5e8a7fec7a5676fe9c727afd177915e34c5d8a5db881e22b8077c3da8083f2ab`
 
-GitHub Actions built both ForgeGradle 5 and 6 variants successfully for commit
-`4ad7204`; the published `mods/pvp/aipilot-1.16.5.jar` contains the same policy bytes.
-Live Minecraft group-combat performance has not been verified; the Python arena's
-explosive splash behavior still differs from Forge runtime behavior.
+The 50-feature training run is in progress; after it finishes, the final actor must be
+re-exported and verified before treating it as a replacement. Live Minecraft
+multi-opponent performance remains unverified, and Python explosive splash still
+differs from Forge runtime behavior.
