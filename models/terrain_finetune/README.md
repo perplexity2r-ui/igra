@@ -21,11 +21,28 @@ The opponent skill and combo-start curriculum ramped during training, so the ful
 
 The same seeded terrain distribution was used in both runs (21 wall, 26 pit, 29 hill, 24 mixed maps). This is a simulator comparison, not a guarantee of performance on a Minecraft server; the hard fixed-skill benchmark remains challenging.
 
-## Forge export
+## One-versus-many continuation
 
-The actor was exported to `forge-mod/src/main/resources/com/arena/aipilot/ppo_policy.bin`.
-`forge-mod/tools/verify_ppo_weights.py --samples 2048` passed: maximum logit error `3.8146973e-06`, zero action mismatches. Resource SHA-256:
+The current multi-opponent actor is a 48-feature extension of the terrain policy. Its
+best-tested checkpoint remains
+`pvp_ppo_terrain_multi_aggressive_aoe_50k.zip`, trained for exactly 50,000 fights after
+a separate 10,000-fight AoE diagnostic. At skill 1.0, the independent 200-fight
+checks won 58/200 against three opponents, 30/200 against four, 22/200 against five,
+12/200 against six, 4/200 against seven, and 1/200 against eight. This is not stable
+winning. Hard-crowd sampling, target-focus, and win/death reward-shaping refinements
+each ran another exact 50,000 fights but did not improve the benchmark. The full
+iteration table is in [`multi_opponent_iterations.md`](multi_opponent_iterations.md).
 
-`91b2c436f3a3ac14a3fbbcefd4fffaa61c4d718ead7fbcda9adfa3bbc7f9cc49`
+## Forge export and runtime
 
-The Forge Java source now expects 44 observations and includes obstacle-aware pursuit plus the K-key style panel. **The Forge JAR was not rebuilt in this environment**: Java, `javac`, Gradle, and a Gradle wrapper are absent. The existing JAR therefore remains the old build until it is rebuilt with the 1.16.5 Forge toolchain.
+The current 48-feature actor was exported to
+`forge-mod/src/main/resources/com/arena/aipilot/ppo_policy.bin`.
+`forge-mod/tools/verify_ppo_weights.py --samples 2048` passed: maximum logit error
+`3.8146973e-06`, zero action mismatches. Resource SHA-256:
+
+`476f41ea115e1c9e73d524ea57b2af86d8d8a6b01c7c3396fefe71f4849c9ee5`
+
+GitHub Actions built both ForgeGradle 5 and 6 variants successfully for commit
+`4ad7204`; the published `mods/pvp/aipilot-1.16.5.jar` contains the same policy bytes.
+Live Minecraft group-combat performance has not been verified; the Python arena's
+explosive splash behavior still differs from Forge runtime behavior.
