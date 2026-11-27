@@ -7,12 +7,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * Pure-Java deterministic inference for the final SB3 PPO actor.
- * The binary resource contains the two 192-wide tanh layers and 30 action logits.
+ * Pure-Java deterministic inference for the multi-opponent SB3 PPO actor.
+ * The binary resource contains the 48-feature input, two 192-wide tanh layers, and 30 action logits.
  */
 public final class PpoPolicy {
     private static final String RESOURCE = "/com/arena/aipilot/ppo_policy.bin";
-    private static final int OBS = 44;
+    private static final int OBS = 48;
     private static final int HIDDEN_1 = 192;
     private static final int HIDDEN_2 = 192;
     private static final int ACTIONS = 30;
@@ -59,11 +59,11 @@ public final class PpoPolicy {
             readFloats(data, w3);
             readFloats(data, b3);
             ready = true;
-            AiPilot.LOG.info("Loaded PPO terrain actor: {} -> {} -> {} -> {}",
+            AiPilot.LOG.info("Loaded PPO multi-opponent actor: {} -> {} -> {} -> {}",
                     OBS, HIDDEN_1, HIDDEN_2, ACTIONS);
         } catch (Exception e) {
             ready = false;
-            AiPilot.LOG.error("Could not load PPO COMBO FINAL actor; auto-combat is disabled", e);
+            AiPilot.LOG.error("Could not load multi-opponent PPO actor; auto-combat is disabled", e);
         }
     }
 

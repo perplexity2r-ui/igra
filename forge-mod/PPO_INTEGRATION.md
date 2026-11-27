@@ -2,9 +2,10 @@
 
 ## Model and runtime
 
-The terrain-aware Forge build embeds the deterministic actor fine-tuned from
-`models/pvp_ppo_combo_final.zip` on 10,000 additional hard-terrain fights. Its
-architecture is `44 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`.
+The current Forge build embeds the deterministic 48-feature actor fine-tuned for
+one-versus-many fights from `models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_50k.zip`.
+It retains the terrain actor's 44 inputs and appends four crowd-context sensors; the
+architecture is `48 -> Linear(192) -> Tanh -> Linear(192) -> Tanh -> Linear(30)`.
 `PpoPolicy` reads `src/main/resources/com/arena/aipilot/ppo_policy.bin` and selects
 `argmax(logits)` in Java. Python, PyTorch, Stable-Baselines3, and network access are
 not needed in the game. The client runs one inference every two Minecraft ticks
@@ -17,18 +18,18 @@ To regenerate and verify the embedded weights after updating the checkpoint:
 .venv/bin/python forge-mod/tools/verify_ppo_weights.py
 ```
 
-The verifier compares all 30 logits against Stable-Baselines3 on 512 seeded
-observations. The terrain-aware resource has SHA-256
-`91b2c436f3a3ac14a3fbbcefd4fffaa61c4d718ead7fbcda9adfa3bbc7f9cc49`.
-If the resource is missing or has an incompatible header/size, the mod fails closed:
+The verifier compares all 30 logits against Stable-Baselines3 on seeded
+observations and prints the resource SHA-256. If the resource is missing or has an
+incompatible header/size, the mod fails closed:
 AI combat is disabled; it does not fall back to the old heuristic.
 
 ## Observation compatibility
 
 The legacy source contract is `env/pro_vec_env.py::_obs()` (`Box(-1, 2, (34,), float32)`).
 Terrain fine-tuning appends ten sensors without changing those first 34 indices, for
-`Box(44,)`. Minecraft has no direct counterpart for some simulator-only state, so the
-bridge uses the following measurements/estimates:
+`Box(44,)`. `env/multi_opponent.py` appends four crowd sensors for `Box(48,)`; the
+original 44 positions and action IDs remain unchanged. Minecraft has no direct
+counterpart for some simulator-only state, so the bridge uses the following measurements/estimates:
 
 | Index | Training feature | Forge input |
 |---:|---|---|
@@ -73,6 +74,10 @@ bridge uses the following measurements/estimates:
 | 38–41 | floor support, forward/left/right/back | solid-ground checks at 1.5 blocks; unsupported holes score zero |
 | 42 | target height delta `/ 3` | target feet height relative to the player's feet |
 | 43 | forward slope `/ 2` | sampled ground-height change 1.5 blocks ahead |
+| 44 | alive opponents `/ 8` | count of valid nearby living targets, clipped to eight |
+| 45 | opponents within melee reach `/ 8` | count within 3.25 horizontal blocks, clipped to eight |
+| 46 | mean opponent distance `/ 20` | mean horizontal distance of the nearest eight valid targets |
+| 47 | mean opponent health `/ 20` | mean health plus absorption of those targets |
 
 The engine also runs a short safe-direction search when the forward probe is blocked,
 adds forward pressure outside melee range, and only retreats automatically below the
@@ -96,22 +101,33 @@ Press **K** in-game to open draggable sliders; values persist to
 
 Press **Esc** to close the panel. Existing keys remain **O** (auto-combat) and **J** (HUD).
 
-## Additional terrain fine-tuning
+## Multi-opponent fine-tuning
 
-The 10,000-fight continuation uses hard maps on every fight and warm-starts from the
-compatible 34-observation/30-action combo checkpoint (the ten new input weights are
-initialized by PPO). `--exact-fights` distributes a fixed completion quota across
-parallel arenas and freezes each row once its quota is met.
+`train_multi.py` warm-starts the 48-feature actor from the aggressive terrain model.
+Every fight has at least three simultaneously active opponents; the curriculum ramps
+up to eight. The learner gets a small gear/resource edge on average, the opponents
+use skill-scaled kits, and player aggression remains at `1.0`. Exact quotas
+freeze each vector row after its allocated number of completed fights.
 
 ```bash
-.venv/bin/python train_pro.py \\
-  --fights 10000 --exact-fights --n-envs 128 \\
-  --load models/pvp_ppo_combo_final.zip --terrain-mix 1.0 \\
-  --n-steps 256 --batch-size 4096 \\
-  --save models/terrain_finetune/pvp_ppo_terrain_10k
+.venv/bin/python train_multi.py \\
+  --fights 50000 --exact-fights --n-envs 128 \\
+  --min-opponents 3 --max-opponents 8 --player-aggression 1.0 \\
+  --load models/terrain_finetune/pvp_ppo_terrain_aggressive_50k.zip \\
+  --save models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_50k
 .venv/bin/python forge-mod/tools/export_ppo_weights.py
 .venv/bin/python forge-mod/tools/verify_ppo_weights.py
+.venv/bin/python play_multi.py --episodes 100 --opponent-cap 8
 ```
+
+The completed 50,000-fight run recorded **5,918 wins, 43,976 losses, and 106 draws**.
+At max opponent skill, the initial deterministic 100-fight checks returned 6W/94L
+against three opponents and 0W/100L against eight. This does not meet the no-loss
+goal. A later simulator fix added collateral explosive damage to other opponents;
+a separate 10,000-fight diagnostic model improved the three-opponent check to 38W/160L/2D
+in 200 fights, but still managed only 1W/199L against eight. That diagnostic is not
+counted as part of the exact 50,000-fight run. See the training summary JSON for
+histograms and the repeat 200-fight checks of the original model.
 
 ## Action compatibility
 

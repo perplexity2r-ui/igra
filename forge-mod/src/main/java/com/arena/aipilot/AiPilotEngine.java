@@ -46,7 +46,7 @@ public final class AiPilotEngine {
     private static double searchRange = 17.0;
     private static LivingEntity target;
     private static final PpoPolicy ppoPolicy = new PpoPolicy();
-    private static final float[] lastObservation = new float[44];
+    private static final float[] lastObservation = new float[48];
     private static final int[] actionCooldownUntilTick = new int[30];
     private static final double[] terrainSampleDistances = {0.75, 1.5, 2.25, 3.0};
     private static TerrainScan cachedTerrainScan;
@@ -270,6 +270,39 @@ public final class AiPilotEngine {
         }
         lastObservation[42] = terrain.targetHeightDelta;
         lastObservation[43] = terrain.forwardSlope;
+        populateCrowdObservation(p, t, mc);
+    }
+
+    /** Append the four fixed crowd features used by the one-versus-many PPO actor. */
+    private static void populateCrowdObservation(ClientPlayerEntity p, LivingEntity target, Minecraft mc) {
+        AxisAlignedBB box = p.getBoundingBox().inflate(searchRange, 6.0, searchRange);
+        List<LivingEntity> nearby = new java.util.ArrayList<>(
+                mc.level.getEntitiesOfClass(LivingEntity.class, box,
+                        e -> e != p && e.isAlive() && e.isPickable()
+                                && !(e instanceof ArmorStandEntity)
+                                && !(e instanceof PlayerEntity && (((PlayerEntity) e).isCreative()
+                                    || ((PlayerEntity) e).isSpectator())))
+        );
+        if (!nearby.contains(target)) nearby.add(target);
+        nearby.sort((a, b) -> Double.compare(horizontalDistance(p, a), horizontalDistance(p, b)));
+        if (nearby.size() > 8) nearby = nearby.subList(0, 8);
+
+        int close = 0;
+        double distanceSum = 0.0;
+        double healthSum = 0.0;
+        for (LivingEntity enemy : nearby) {
+            double distance = horizontalDistance(p, enemy);
+            if (distance <= 3.25) close++;
+            distanceSum += distance;
+            healthSum += enemy.getHealth() + enemy.getAbsorptionAmount();
+        }
+        int count = nearby.size();
+        lastObservation[44] = count / 8.0F;
+        lastObservation[45] = close / 8.0F;
+        lastObservation[46] = count == 0 ? 0.0F
+                : clip((float) (distanceSum / count / 20.0), 0.0F, 1.0F);
+        lastObservation[47] = count == 0 ? 0.0F
+                : clip((float) (healthSum / count / 20.0), 0.0F, 1.5F);
     }
 
     private static final class TerrainScan {
