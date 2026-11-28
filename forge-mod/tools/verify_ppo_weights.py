@@ -10,21 +10,21 @@ import numpy as np
 import torch
 from stable_baselines3 import PPO
 
-OBS, H1, H2, ACTIONS = 44, 192, 192, 30
+OBS, H1, H2, ACTIONS = 52, 192, 192, 30
 
 
 def main() -> None:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path,
-                        default=root / "models/terrain_finetune/pvp_ppo_terrain_10k.zip")
+                        default=root / "models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_seed.zip")
     parser.add_argument(
         "--weights",
         type=Path,
         default=Path(__file__).resolve().parents[1]
         / "src/main/resources/com/arena/aipilot/ppo_policy.bin",
     )
-    parser.add_argument("--samples", type=int, default=512)
+    parser.add_argument("--samples", type=int, default=2048)
     args = parser.parse_args()
 
     raw = args.weights.read_bytes()

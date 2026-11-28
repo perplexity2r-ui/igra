@@ -18,7 +18,7 @@ from env.pro_vec_env import OBS_DIM, TERRAIN_OBS_DIM, TECHNIQUES, ProPvPEnv
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--model", default="models/terrain_finetune/pvp_ppo_terrain_10k.zip")
+    p.add_argument("--model", default="models/terrain_finetune/pvp_ppo_terrain_aggressive_50k.zip")
     p.add_argument("--episodes", type=int, default=20)
     p.add_argument("--skill", type=float, default=1.0, help="professional opponent skill 0..1")
     p.add_argument("--terrain-mix", type=float, default=0.0,

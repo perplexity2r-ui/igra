@@ -9,6 +9,7 @@ import net.minecraft.entity.ai.attributes.Attributes;
 import net.minecraft.entity.item.ArmorStandEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.EquipmentSlotType;
+import net.minecraft.inventory.container.ClickType;
 import net.minecraft.entity.item.EnderCrystalEntity;
 import net.minecraft.item.AxeItem;
 import net.minecraft.item.BlockItem;
@@ -46,7 +47,7 @@ public final class AiPilotEngine {
     private static double searchRange = 17.0;
     private static LivingEntity target;
     private static final PpoPolicy ppoPolicy = new PpoPolicy();
-    private static final float[] lastObservation = new float[44];
+    private static final float[] lastObservation = new float[52];
     private static final int[] actionCooldownUntilTick = new int[30];
     private static final double[] terrainSampleDistances = {0.75, 1.5, 2.25, 3.0};
     private static TerrainScan cachedTerrainScan;
@@ -65,6 +66,14 @@ public final class AiPilotEngine {
     private static int lastMeleeAttackTick = -1_000_000;
     private static int counterUntilTick = 0;
     private static int counterArmedUntilTick = 0;
+    private static int pendingCritTargetId = -1;
+    private static int pendingCritUntilTick = -1;
+    private static int lastCritAttackTick = -1_000_000;
+    private static int forcedAimUntilTick = -1;
+    private static float forcedAimYaw = 0.0F;
+    private static float forcedAimPitch = 0.0F;
+    private static int forcedRetreatUntilTick = -1;
+    private static int forcedRetreatTargetId = -1;
     private static int enemyStunUntilTick = 0;
     private static int crystalDetonateUntilTick = 0;
     private static int rangedReleaseTick = 0;
@@ -82,7 +91,9 @@ public final class AiPilotEngine {
 
     public static void reset() {
         ClientPlayerEntity localPlayer = Minecraft.getInstance().player;
-        if (shieldActionActive && localPlayer != null) localPlayer.stopUsingItem();
+        if ((shieldActionActive || rangedReleaseTick > 0) && localPlayer != null) {
+            localPlayer.stopUsingItem();
+        }
         target = null;
         Arrays.fill(lastObservation, 0.0F);
         Arrays.fill(actionCooldownUntilTick, 0);
@@ -99,6 +110,12 @@ public final class AiPilotEngine {
         lastMeleeAttackTick = -1_000_000;
         counterUntilTick = 0;
         counterArmedUntilTick = 0;
+        pendingCritTargetId = -1;
+        pendingCritUntilTick = -1;
+        lastCritAttackTick = -1_000_000;
+        forcedAimUntilTick = -1;
+        forcedAimYaw = 0.0F;
+        forcedAimPitch = 0.0F;
         enemyStunUntilTick = 0;
         crystalDetonateUntilTick = 0;
         rangedReleaseTick = 0;
@@ -108,6 +125,8 @@ public final class AiPilotEngine {
         cachedTerrainScan = null;
         cachedTerrainTick = Integer.MIN_VALUE;
         cachedTerrainTargetId = -1;
+        forcedRetreatUntilTick = -1;
+        forcedRetreatTargetId = -1;
         inForward = 0.0F;
         inStrafe = 0.0F;
         inJump = false;
@@ -164,7 +183,8 @@ public final class AiPilotEngine {
             p.inventory.selected = combatWeaponSlot;
         }
         double dist = horizontalDistance(p, target);
-        aimAt(p, target, dist);
+        if (rangedReleaseTick > 0) aimAtProjectileTarget(p, target);
+        else aimAtTargetOrForced(p, target, dist);
         updateComboState(p, target);
         detonatePlacedCrystal(mc, p);
 
@@ -172,10 +192,12 @@ public final class AiPilotEngine {
         if ((p.tickCount & 1) == 0 && lastPolicyTick != p.tickCount) {
             lastPolicyTick = p.tickCount;
             buildObservation(p, target, mc);
-            lastAction = ppoPolicy.predict(lastObservation);
+            int proposedAction = ppoPolicy.predict(lastObservation);
+            lastAction = selectTacticalAction(p, target, proposedAction);
             modelStepCount = Math.min(600, modelStepCount + 1);
             applyPolicyAction(mc, p, target, lastAction);
         }
+        processPendingCrit(mc, p, target);
         applyNavigationAssist(mc, p, target);
     }
 
@@ -191,15 +213,22 @@ public final class AiPilotEngine {
         lastMeleeAttackTick = -1_000_000;
         counterUntilTick = 0;
         counterArmedUntilTick = 0;
+        pendingCritTargetId = -1;
+        pendingCritUntilTick = -1;
+        lastCritAttackTick = -1_000_000;
+        forcedAimUntilTick = -1;
+        forcedAimYaw = 0.0F;
+        forcedAimPitch = 0.0F;
         enemyStunUntilTick = 0;
         crystalDetonateUntilTick = 0;
-        rangedReleaseTick = 0;
         placedCrystalBase = null;
         lastAction = -1;
         lastPolicyTick = Integer.MIN_VALUE;
         cachedTerrainScan = null;
         cachedTerrainTick = Integer.MIN_VALUE;
         cachedTerrainTargetId = -1;
+        forcedRetreatUntilTick = -1;
+        forcedRetreatTargetId = -1;
         Arrays.fill(lastObservation, 0.0F);
     }
 
@@ -236,9 +265,16 @@ public final class AiPilotEngine {
                 + countPotionsWithEffect(p, Effects.MOVEMENT_SPEED);
         int ranged = countInventoryItem(p, Items.SNOWBALL) + countInventoryItem(p, Items.EGG)
                 + countInventoryItem(p, Items.ARROW) + countInventoryItem(p, Items.TIPPED_ARROW)
-                + countInventoryItem(p, Items.SPECTRAL_ARROW) + countInventoryItem(p, Items.CROSSBOW)
-                + countSplashPotions(p, Effects.HARM);
-        lastObservation[18] = clip((buffs + ranged) / 12.0F, 0.0F, 1.0F);
+                + countInventoryItem(p, Items.SPECTRAL_ARROW) + countInventoryItem(p, Items.BOW)
+                + countInventoryItem(p, Items.CROSSBOW) + countSplashPotions(p, Effects.HARM);
+        float rangedFeature = clip((buffs + ranged) / 12.0F, 0.0F, 0.60F);
+        boolean hasBowAmmo = hasArrowAmmo(p) && countInventoryItem(p, Items.BOW) > 0;
+        boolean hasCrossbowAmmo = hasArrowAmmo(p) && countInventoryItem(p, Items.CROSSBOW) > 0;
+        if (hasBowAmmo) rangedFeature = 0.75F;
+        if (hasCrossbowAmmo) rangedFeature = 0.85F;
+        if (findCrossbowInventorySlot(p, true) >= 0) rangedFeature = 1.10F;
+        if (rangedReleaseTick > 0 && p.isUsingItem()) rangedFeature = 1.25F;
+        lastObservation[18] = rangedFeature;
         lastObservation[19] = isShieldBlocking(p) ? 1.0F : 0.0F;
         lastObservation[20] = isShieldBlocking(t) ? 1.0F : 0.0F;
         lastObservation[21] = clip(countBuildingBlocks(p) / 24.0F, 0.0F, 1.0F);
@@ -247,6 +283,8 @@ public final class AiPilotEngine {
         lastObservation[22] = clip(utilities / 6.0F, 0.0F, 1.0F);
         lastObservation[23] = (!p.canSee(t) ? 1.0F : 0.0F) / 6.0F;
         lastObservation[24] = clip(countInventoryItem(p, Items.END_CRYSTAL) / 6.0F, 0.0F, 1.0F);
+        // Preserve the actor's inventory-count features; action handlers separately
+        // guard the dimension and full ingredient requirements before using explosives.
         lastObservation[25] = clip(countInventoryItem(p, Items.RESPAWN_ANCHOR) / 4.0F, 0.0F, 1.0F);
         lastObservation[26] = clip(countInventoryItem(p, Items.TNT_MINECART) / 4.0F, 0.0F, 1.0F);
         int enemyExplosives = opponent == null ? 0
@@ -270,6 +308,72 @@ public final class AiPilotEngine {
         }
         lastObservation[42] = terrain.targetHeightDelta;
         lastObservation[43] = terrain.forwardSlope;
+        populateCrowdObservation(p, t, mc);
+    }
+
+    /** Append the four fixed crowd features used by the one-versus-many PPO actor. */
+    private static void populateCrowdObservation(ClientPlayerEntity p, LivingEntity target, Minecraft mc) {
+        AxisAlignedBB box = p.getBoundingBox().inflate(searchRange, 6.0, searchRange);
+        List<LivingEntity> nearby = new java.util.ArrayList<>(
+                mc.level.getEntitiesOfClass(LivingEntity.class, box,
+                        e -> e != p && e.isAlive() && e.isPickable()
+                                && !(e instanceof ArmorStandEntity)
+                                && !(e instanceof PlayerEntity && (((PlayerEntity) e).isCreative()
+                                    || ((PlayerEntity) e).isSpectator())))
+        );
+        if (!nearby.contains(target)) nearby.add(target);
+        nearby.sort((a, b) -> Double.compare(horizontalDistance(p, a), horizontalDistance(p, b)));
+        if (nearby.size() > 8) {
+            java.util.ArrayList<LivingEntity> nearest = new java.util.ArrayList<>(nearby.subList(0, 8));
+            if (!nearest.contains(target)) {
+                nearest.set(nearest.size() - 1, target);
+                nearest.sort((a, b) -> Double.compare(horizontalDistance(p, a), horizontalDistance(p, b)));
+            }
+            nearby = nearest;
+        }
+
+        int close = 0;
+        double distanceSum = 0.0;
+        double healthSum = 0.0;
+        double nearestOtherDistance = Double.MAX_VALUE;
+        double nearestOtherDx = 0.0;
+        double nearestOtherDz = 0.0;
+        double pressureXSum = 0.0;
+        double pressureZSum = 0.0;
+        double pressureWeightSum = 0.0;
+        for (LivingEntity enemy : nearby) {
+            double distance = horizontalDistance(p, enemy);
+            if (distance <= 3.25) close++;
+            distanceSum += distance;
+            healthSum += enemy.getHealth() + enemy.getAbsorptionAmount();
+            if (enemy != target) {
+                double dx = enemy.getX() - p.getX();
+                double dz = enemy.getZ() - p.getZ();
+                double weight = 1.0 / (1.0 + distance);
+                double safeDistance = Math.max(distance, 1.0e-6);
+                pressureXSum += dx / safeDistance * weight;
+                pressureZSum += dz / safeDistance * weight;
+                pressureWeightSum += weight;
+                if (distance < nearestOtherDistance) {
+                    nearestOtherDistance = distance;
+                    nearestOtherDx = dx;
+                    nearestOtherDz = dz;
+                }
+            }
+        }
+        int count = nearby.size();
+        lastObservation[44] = count / 8.0F;
+        lastObservation[45] = close / 8.0F;
+        lastObservation[46] = count == 0 ? 0.0F
+                : clip((float) (distanceSum / count / 20.0), 0.0F, 1.0F);
+        lastObservation[47] = count == 0 ? 0.0F
+                : clip((float) (healthSum / count / 20.0), 0.0F, 1.5F);
+        lastObservation[48] = clip((float) (nearestOtherDx / 20.0), -1.0F, 1.0F);
+        lastObservation[49] = clip((float) (nearestOtherDz / 20.0), -1.0F, 1.0F);
+        lastObservation[50] = pressureWeightSum == 0.0 ? 0.0F
+                : clip((float) (pressureXSum / pressureWeightSum), -1.0F, 1.0F);
+        lastObservation[51] = pressureWeightSum == 0.0 ? 0.0F
+                : clip((float) (pressureZSum / pressureWeightSum), -1.0F, 1.0F);
     }
 
     private static final class TerrainScan {
@@ -471,6 +575,13 @@ public final class AiPilotEngine {
         return count;
     }
 
+    private static int countDetonatingMinecartKits(PlayerEntity player) {
+        int powerSources = countInventoryItem(player, Items.REDSTONE_BLOCK)
+                + countInventoryItem(player, Items.REDSTONE_TORCH);
+        return Math.min(countInventoryItem(player, Items.TNT_MINECART),
+                Math.min(countInventoryItem(player, Items.ACTIVATOR_RAIL), powerSources));
+    }
+
     private static int countHealingApples(PlayerEntity player) {
         return countInventoryItem(player, Items.GOLDEN_APPLE)
                 + countInventoryItem(player, Items.ENCHANTED_GOLDEN_APPLE);
@@ -510,12 +621,7 @@ public final class AiPilotEngine {
         if (player == null) return 0;
         int count = 0;
         for (ItemStack stack : player.inventory.items) {
-            if (!stack.isEmpty() && stack.getItem() instanceof BlockItem
-                    && stack.getItem() != Items.OBSIDIAN
-                    && stack.getItem() != Items.COBWEB
-                    && stack.getItem() != Items.RESPAWN_ANCHOR) {
-                count += stack.getCount();
-            }
+            if (isBuildingBlock(stack, false)) count += stack.getCount();
         }
         return count;
     }
@@ -545,8 +651,76 @@ public final class AiPilotEngine {
         return Math.max(low, Math.min(high, value));
     }
 
+    private static int selectTacticalAction(ClientPlayerEntity p, LivingEntity t, int proposed) {
+        if (isLongItemUse(p)) return proposed;
+        int closeCount = Math.round(lastObservation[45] * 8.0F);
+        double distance = horizontalDistance(p, t);
+        float healthRatio = p.getHealth() / Math.max(1.0F, p.getMaxHealth());
+        boolean recentDamage = p.tickCount - lastPlayerDamageTick <= 32;
+        boolean hasHealPotion = findPotionInventorySlot(p, Effects.HEAL, true) >= 0;
+        boolean hasApple = countHealingApples(p) > 0;
+        boolean hasPearl = countInventoryItem(p, Items.ENDER_PEARL) > 0;
+        boolean hasShield = countInventoryItem(p, Items.SHIELD) > 0;
+        boolean hasCage = countInventoryItem(p, Items.OBSIDIAN) >= 4;
+        boolean hasBuildingBlocks = findInventoryBlockSlot(p, false) >= 0;
+
+        // Escape an active chain before choosing damage or utility actions.
+        if (playerComboTaken > 0 && recentDamage && hasComboEscape(p)) return 28;
+
+        // Conserve healing until it can make a meaningful difference; at critical
+        // health, the override is stronger than the policy's original action.
+        float missingHealth = p.getMaxHealth() - p.getHealth();
+        if (healthRatio <= 0.40F && hasHealPotion && missingHealth >= 4.0F) return 14;
+        if (healthRatio <= 0.62F && hasApple
+                && (missingHealth >= 5.0F || (p.getAbsorptionAmount() < 1.5F && closeCount >= 2))) {
+            return 13;
+        }
+        if (healthRatio <= 0.55F && hasHealPotion && missingHealth >= 5.0F) return 14;
+
+        // When surrounded at low health, prefer escape/defense over a forward trade.
+        if (closeCount >= 2 && healthRatio <= 0.58F) {
+            if (hasPearl) return 15;
+            if (hasShield) return 12;
+            if (hasCage) return 25;
+            if (hasBuildingBlocks) return 18;
+            return 2;
+        }
+        if (recentDamage && closeCount >= 2 && distance <= 4.0 && hasShield) return 12;
+
+        // Keep pressure on a target already reeling: a charged follow-up uses the
+        // learned W-tap/sprint-reset action instead of waiting for another random pick.
+        if (enemyComboTaken > 0 && p.tickCount - lastEnemyDamageTick <= 22
+                && distance <= 3.45 && p.getAttackStrengthScale(0.5F) >= 0.95F) return 26;
+
+        // Schedule a clean jump-crit only when there is room to swing, not while
+        // charging into a packed group.
+        boolean attackIntent = proposed == 5 || proposed == 6 || proposed == 7 || proposed == 11;
+        if (attackIntent && distance <= 3.25 && closeCount <= 1 && p.isOnGround()
+                && p.getAttackStrengthScale(0.5F) >= 0.95F
+                && p.tickCount - lastCritAttackTick >= 32) return 9;
+
+        // If the learner is outside reach while at least two enemies are already
+        // nearby, back out and re-approach from the edge rather than pushing inward.
+        boolean forwardIntent = proposed == 1 || proposed == 5 || proposed == 9 || proposed == 10;
+        if (closeCount >= 2 && (proposed == 0 || proposed == 8 || proposed == 9
+                || (distance > 3.25 && forwardIntent))) return 2;
+        return proposed;
+    }
+
+    private static boolean hasComboEscape(ClientPlayerEntity p) {
+        return countInventoryItem(p, Items.SHIELD) > 0
+                || countInventoryItem(p, Items.WATER_BUCKET) > 0
+                || countInventoryItem(p, Items.ENDER_PEARL) > 0;
+    }
+
     private static void applyPolicyAction(Minecraft mc, ClientPlayerEntity p, LivingEntity t, int action) {
-        if (shieldActionActive && action != 12) {
+        if (pendingCritTargetId >= 0 && (action == 2 || action == 12 || action == 13
+                || action == 14 || action == 15 || action == 18 || action == 19
+                || action == 20 || action == 21 || action == 22 || action == 23
+                || action == 24 || action == 25 || action == 27 || action == 28 || action == 29)) {
+            clearPendingCrit();
+        }
+        if (shieldActionActive && action != 12 && action != 28) {
             p.stopUsingItem();
             shieldActionActive = false;
         }
@@ -567,8 +741,11 @@ public final class AiPilotEngine {
         switch (action) {
             case 0: break;
             case 1: case 2: case 3: case 4: case 8: case 10: break;
-            case 5: case 6: case 7: case 9: case 11:
+            case 5: case 6: case 7: case 11:
                 attackTarget(mc, p, t);
+                break;
+            case 9:
+                queueCriticalJump(p, t);
                 break;
             case 12:
                 raisePpoShield(mc, p);
@@ -579,16 +756,22 @@ public final class AiPilotEngine {
             case 14:
                 usePotion(mc, p, Effects.HEAL, true);
                 break;
-            case 15:
-                useHotbarItem(mc, p, Items.ENDER_PEARL);
+            case 15: {
+                boolean pearlEscape = (playerComboTaken > 0)
+                        || (p.getHealth() / Math.max(1.0F, p.getMaxHealth()) <= 0.60F
+                            && Math.round(lastObservation[45] * 8.0F) >= 2);
+                if (useEnderPearl(mc, p, t, pearlEscape) && pearlEscape) {
+                    scheduleRetreat(p, t, 10);
+                }
                 break;
+            }
             case 16:
                 if (!usePotion(mc, p, Effects.DAMAGE_BOOST, false)) {
                     usePotion(mc, p, Effects.MOVEMENT_SPEED, false);
                 }
                 break;
             case 17:
-                useRangedItem(mc, p);
+                useRangedItem(mc, p, t);
                 break;
             case 18:
                 placeBarricade(mc, p, t);
@@ -603,25 +786,27 @@ public final class AiPilotEngine {
                 placePillarBlock(mc, p);
                 break;
             case 22:
-                useCrystalCombo(mc, p, t, false);
+                if (useCrystalCombo(mc, p, t, false)) scheduleRetreat(p, t, 18);
                 break;
             case 23:
-                useRespawnAnchor(mc, p, t);
+                if (useRespawnAnchor(mc, p, t)) scheduleRetreat(p, t, 18);
                 break;
             case 24:
-                useTntMinecart(mc, p, t);
+                if (useTntMinecart(mc, p, t)) scheduleRetreat(p, t, 60);
                 break;
             case 25:
                 placeObsidianCage(mc, p);
                 break;
             case 26:
+                inSprint = false;
+                p.setSprinting(false);
                 attackTarget(mc, p, t);
                 break;
             case 27:
-                useCrystalCombo(mc, p, t, true);
+                if (useCrystalCombo(mc, p, t, true)) scheduleRetreat(p, t, 18);
                 break;
             case 28:
-                breakCombo(mc, p);
+                breakCombo(mc, p, t);
                 break;
             case 29:
                 counterCombo(mc, p, t);
@@ -649,43 +834,67 @@ public final class AiPilotEngine {
         }
     }
 
+    private static boolean hasArrowAmmo(PlayerEntity p) {
+        return countInventoryItem(p, Items.ARROW) + countInventoryItem(p, Items.TIPPED_ARROW)
+                + countInventoryItem(p, Items.SPECTRAL_ARROW) > 0;
+    }
+
+    private static boolean isCrossbowCharged(ItemStack stack) {
+        return stack != null && !stack.isEmpty() && stack.getItem() == Items.CROSSBOW
+                && stack.hasTag() && stack.getTag().getBoolean("Charged");
+    }
+
+    private static int findCrossbowInventorySlot(PlayerEntity p, boolean chargedOnly) {
+        if (p == null) return -1;
+        for (int i = 0; i < p.inventory.items.size(); i++) {
+            ItemStack stack = p.inventory.items.get(i);
+            if (stack.getItem() == Items.CROSSBOW
+                    && (!chargedOnly || isCrossbowCharged(stack))) return i;
+        }
+        return -1;
+    }
+
+    private static int findHotbarCrossbow(ClientPlayerEntity p, boolean chargedOnly) {
+        int inventorySlot = findCrossbowInventorySlot(p, chargedOnly);
+        if (inventorySlot < 0) return -1;
+        return inventorySlot < 9 ? inventorySlot : moveInventorySlotToHotbar(p, inventorySlot);
+    }
+
+    private static boolean hasUsableRangedAttack(ClientPlayerEntity p) {
+        return findPotionInventorySlot(p, Effects.HARM, true) >= 0
+                || countInventoryItem(p, Items.SNOWBALL) > 0
+                || countInventoryItem(p, Items.EGG) > 0
+                || findCrossbowInventorySlot(p, true) >= 0
+                || (hasArrowAmmo(p) && (countInventoryItem(p, Items.CROSSBOW) > 0
+                    || countInventoryItem(p, Items.BOW) > 0));
+    }
+
     private static boolean hasHotbarResource(ClientPlayerEntity p, int action) {
         switch (action) {
             case 13:
-                return findHotbarSlot(p, Items.GOLDEN_APPLE) >= 0
-                        || findHotbarSlot(p, Items.ENCHANTED_GOLDEN_APPLE) >= 0;
-            case 14: return findHotbarPotion(p, Effects.HEAL, true) >= 0;
-            case 15: return findHotbarSlot(p, Items.ENDER_PEARL) >= 0;
-            case 16: return findHotbarPotion(p, Effects.DAMAGE_BOOST, false) >= 0
-                        || findHotbarPotion(p, Effects.MOVEMENT_SPEED, false) >= 0;
-            case 17:
-                return findHotbarPotion(p, Effects.HARM, true) >= 0
-                        || findHotbarSlot(p, Items.SNOWBALL) >= 0 || findHotbarSlot(p, Items.EGG) >= 0
-                        || findHotbarSlot(p, Items.CROSSBOW) >= 0 || findHotbarSlot(p, Items.BOW) >= 0;
-            case 18: case 21: return findHotbarBlock(p, false) >= 0;
-            case 19: return findHotbarSlot(p, Items.COBWEB) >= 0
-                        || findHotbarSlot(p, Items.LAVA_BUCKET) >= 0;
-            case 20: return findHotbarSlot(p, Items.WATER_BUCKET) >= 0;
-            case 22: return findHotbarSlot(p, Items.END_CRYSTAL) >= 0
-                        && findHotbarSlot(p, Items.OBSIDIAN) >= 0;
-            case 23: return findHotbarSlot(p, Items.RESPAWN_ANCHOR) >= 0;
-            case 24: return findHotbarSlot(p, Items.RAIL) >= 0
-                        && findHotbarSlot(p, Items.TNT_MINECART) >= 0;
-            case 25: return countHotbarItem(p, Items.OBSIDIAN) >= 4;
-            case 27: return findHotbarSlot(p, Items.ENDER_PEARL) >= 0
-                        && findHotbarSlot(p, Items.END_CRYSTAL) >= 0
-                        && findHotbarSlot(p, Items.OBSIDIAN) >= 0;
+                return countHealingApples(p) > 0;
+            case 14: return findPotionInventorySlot(p, Effects.HEAL, true) >= 0;
+            case 15: return countInventoryItem(p, Items.ENDER_PEARL) > 0;
+            case 16: return findPotionInventorySlot(p, Effects.DAMAGE_BOOST, false) >= 0
+                        || findPotionInventorySlot(p, Effects.MOVEMENT_SPEED, false) >= 0;
+            case 17: return hasUsableRangedAttack(p);
+            case 18: case 21: return findInventoryBlockSlot(p, false) >= 0;
+            case 19: return countInventoryItem(p, Items.COBWEB) > 0
+                        || countInventoryItem(p, Items.LAVA_BUCKET) > 0;
+            case 20: return countInventoryItem(p, Items.WATER_BUCKET) > 0;
+            case 22: return countInventoryItem(p, Items.END_CRYSTAL) > 0
+                        && countInventoryItem(p, Items.OBSIDIAN) > 0;
+            case 23:
+                return countInventoryItem(p, Items.RESPAWN_ANCHOR) > 0
+                        && countInventoryItem(p, Items.GLOWSTONE) > 0
+                        && !p.level.dimensionType().respawnAnchorWorks();
+            case 24: return countDetonatingMinecartKits(p) > 0;
+            case 25: return countInventoryItem(p, Items.OBSIDIAN) >= 4;
+            case 27: return countInventoryItem(p, Items.ENDER_PEARL) > 0
+                        && countInventoryItem(p, Items.END_CRYSTAL) > 0
+                        && countInventoryItem(p, Items.OBSIDIAN) > 0;
             default: return false;
         }
-    }
-
-    private static int countHotbarItem(PlayerEntity p, Item item) {
-        int count = 0;
-        for (int i = 0; i < 9; i++) {
-            ItemStack stack = p.inventory.items.get(i);
-            if (!stack.isEmpty() && stack.getItem() == item) count += stack.getCount();
-        }
-        return count;
     }
 
     private static void applyNavigationAssist(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
@@ -697,21 +906,43 @@ public final class AiPilotEngine {
         float caution = AiPilotSettings.caution();
 
         boolean blockedAhead = scan.clearance[0] < 0.99F || scan.support[0] < 0.5F;
-        double routeX = scan.directionX[0];
-        double routeZ = scan.directionZ[0];
-        if (blockedAhead && distance > 1.65 && pursuit > 0.01F) {
+        boolean deliberateRetreat = lastAction == 2 || lastAction == 11 || lastAction == 12
+                || lastAction == 18 || lastAction == 22 || lastAction == 23
+                || lastAction == 24 || lastAction == 28;
+        boolean preservePolicyMovement = deliberateRetreat || lastAction == 25 || lastAction == 8
+                || lastAction == 3 || lastAction == 4 || lastAction == 6 || lastAction == 7;
+        if (deliberateRetreat && distance > 1.65) {
+            int retreatDirection = 3;
+            if (scan.support[retreatDirection] <= 0.5F || scan.clearance[retreatDirection] <= 0.25F) {
+                retreatDirection = -1;
+                for (int candidate : new int[]{1, 2}) {
+                    if (scan.support[candidate] > 0.5F && scan.clearance[candidate] > 0.25F
+                            && (retreatDirection < 0
+                                || scan.clearance[candidate] > scan.clearance[retreatDirection])) {
+                        retreatDirection = candidate;
+                    }
+                }
+            }
+            if (retreatDirection >= 0) {
+                setMovementToward(p, scan.directionX[retreatDirection],
+                        scan.directionZ[retreatDirection], 0.82F);
+            } else {
+                inForward = 0.0F;
+                inStrafe = 0.0F;
+                inSprint = false;
+            }
+        } else if (preservePolicyMovement) {
+            // Respect back/strafe/guard/cage intents instead of silently pushing forward.
+        } else if (blockedAhead && distance > 1.65 && pursuit > 0.01F) {
             double[] route = chooseSafePursuitDirection(mc, p, scan);
-            routeX = route[0];
-            routeZ = route[1];
             float strength = 0.45F + 0.55F * pursuit;
-            setMovementToward(p, routeX, routeZ, strength);
+            setMovementToward(p, route[0], route[1], strength);
             if (p.isOnGround() && scan.support[0] > 0.5F
                     && isLowObstacleAhead(mc, p, scan.directionX[0], scan.directionZ[0])) {
                 inJump = true;
             }
         } else if (distance > 3.0 && pursuit > 0.01F) {
-            // The user-facing aggression slider is a bias against kiting: outside
-            // melee range the bot advances instead of settling into a retreat loop.
+            // Pursuit assist must not cancel a PPO-selected retreat/strafe/guard.
             float chase = (0.18F + 0.72F * aggression) * pursuit;
             inForward = Math.max(inForward, chase);
             inSprint = aggression > 0.45F && distance > 5.0;
@@ -733,6 +964,44 @@ public final class AiPilotEngine {
         float retreatThreshold = 0.10F + 0.30F * caution;
         if (caution > 0.01F && healthRatio < retreatThreshold && distance < 4.0) {
             inForward = Math.min(inForward, -0.20F - 0.45F * caution);
+        }
+
+        if (pendingCritTargetId == t.getId() && p.tickCount <= pendingCritUntilTick) {
+            inSprint = false;
+            if (p.isOnGround()) {
+                inForward = Math.max(inForward, 0.65F);
+                inJump = true;
+            } else {
+                inForward = 0.0F;
+                inStrafe = 0.0F;
+                inJump = false;
+            }
+        }
+
+        if (forcedRetreatTargetId == t.getId() && p.tickCount <= forcedRetreatUntilTick) {
+            int retreatDirection = 3;
+            if (scan.support[retreatDirection] <= 0.5F || scan.clearance[retreatDirection] <= 0.25F) {
+                retreatDirection = -1;
+                for (int candidate : new int[]{1, 2}) {
+                    if (scan.support[candidate] > 0.5F && scan.clearance[candidate] > 0.25F
+                            && (retreatDirection < 0
+                                || scan.clearance[candidate] > scan.clearance[retreatDirection])) {
+                        retreatDirection = candidate;
+                    }
+                }
+            }
+            if (retreatDirection >= 0) {
+                setMovementToward(p, scan.directionX[retreatDirection],
+                        scan.directionZ[retreatDirection], 0.95F);
+            } else {
+                inForward = 0.0F;
+                inStrafe = 0.0F;
+                inSprint = false;
+            }
+            inJump = false;
+        } else if (p.tickCount > forcedRetreatUntilTick) {
+            forcedRetreatUntilTick = -1;
+            forcedRetreatTargetId = -1;
         }
     }
 
@@ -814,12 +1083,13 @@ public final class AiPilotEngine {
             case 6: inStrafe = 1.0F; break;
             case 7: inStrafe = -1.0F; break;
             case 8: inJump = true; break;
-            case 9: inForward = 1.0F; inJump = true; inSprint = true; break;
+            case 9: inForward = 1.0F; break;
             case 10: inForward = 1.0F; inSprint = true; break;
             case 11: inForward = -1.0F; break;
             case 12: inForward = -0.45F; break;
-            case 18: case 22: case 28: inForward = -0.45F; break;
+            case 18: case 22: case 23: case 28: inForward = -0.45F; break;
             case 21: inJump = true; break;
+            case 24: inForward = -0.8F; inSprint = true; break;
             case 29: inForward = 0.4F; break;
             default: break;
         }
@@ -843,6 +1113,48 @@ public final class AiPilotEngine {
         }
     }
 
+    private static void queueCriticalJump(ClientPlayerEntity p, LivingEntity t) {
+        if (t == null || !t.isAlive() || p.isUsingItem() || !p.isOnGround()) return;
+        if (pendingCritTargetId < 0 && p.tickCount - lastCritAttackTick < 32) return;
+        if (pendingCritTargetId != t.getId() || p.tickCount > pendingCritUntilTick) {
+            pendingCritTargetId = t.getId();
+            pendingCritUntilTick = p.tickCount + 16; // same 0.8 s window as the simulator
+        }
+        inSprint = false;
+        p.setSprinting(false);
+        inForward = 1.0F;
+        inJump = true;
+    }
+
+    private static void processPendingCrit(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+        if (pendingCritTargetId < 0) return;
+        if (t == null || !t.isAlive() || t.getId() != pendingCritTargetId
+                || p.tickCount > pendingCritUntilTick) {
+            clearPendingCrit();
+            return;
+        }
+        if (isLongItemUse(p) || p.isUsingItem()) return;
+        if (p.isOnGround() || p.getDeltaMovement().y >= -0.05) return;
+
+        // Vanilla critical hits require a clean fall, no sprint, and no water/passenger state.
+        inSprint = false;
+        p.setSprinting(false);
+        if (p.isInWater() || p.isPassenger() || horizontalDistance(p, t) > 3.45
+                || !p.canSee(t) || p.getAttackStrengthScale(0.5F) < 0.95F) return;
+
+        mc.gameMode.attack(p, t);
+        p.swing(Hand.MAIN_HAND);
+        lastMeleeAttackTick = p.tickCount;
+        lastCritAttackTick = p.tickCount;
+        enemyStunUntilTick = p.tickCount + 9;
+        clearPendingCrit();
+    }
+
+    private static void clearPendingCrit() {
+        pendingCritTargetId = -1;
+        pendingCritUntilTick = -1;
+    }
+
     private static void attackTarget(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
         if (t == null || !t.isAlive() || horizontalDistance(p, t) > 3.45
                 || !p.canSee(t) || p.isUsingItem()
@@ -857,10 +1169,10 @@ public final class AiPilotEngine {
         if (lastAction == 26) p.setSprinting(false); // vanilla sprint reset; the simulator's extra bonus is not forge-exposed
     }
 
-    private static void raisePpoShield(Minecraft mc, ClientPlayerEntity p) {
+    private static boolean raisePpoShield(Minecraft mc, ClientPlayerEntity p) {
         if (p.isBlocking()) {
             shieldActionActive = true;
-            return;
+            return true;
         }
         Hand hand = null;
         if (p.getOffhandItem().getItem() instanceof ShieldItem) {
@@ -874,10 +1186,10 @@ public final class AiPilotEngine {
                 hand = Hand.MAIN_HAND;
             }
         }
-        if (hand != null) {
-            mc.gameMode.useItem(p, p.level, hand);
-            shieldActionActive = true;
-        }
+        if (hand == null) return false;
+        mc.gameMode.useItem(p, p.level, hand);
+        shieldActionActive = true;
+        return true;
     }
 
     private static boolean useHotbarItem(Minecraft mc, ClientPlayerEntity p, Item... items) {
@@ -891,9 +1203,27 @@ public final class AiPilotEngine {
         return false;
     }
 
+    private static boolean useEnderPearl(Minecraft mc, ClientPlayerEntity p,
+                                         LivingEntity t, boolean escape) {
+        int slot = findHotbarSlot(p, Items.ENDER_PEARL);
+        if (slot < 0 || p.isUsingItem()) return false;
+        if (escape && t != null) {
+            double dx = p.getX() - t.getX();
+            double dz = p.getZ() - t.getZ();
+            float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0F;
+            forceAim(p, yaw, -8.0F, 4);
+        }
+        select(p, slot);
+        mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
+        return true;
+    }
+
     private static boolean usePotion(Minecraft mc, ClientPlayerEntity p, Effect effect, boolean splashOnly) {
         int slot = findHotbarPotion(p, effect, splashOnly);
-        if (slot < 0) return false;
+        if (slot < 0 || p.isUsingItem()) return false;
+        if (splashOnly && effect == Effects.HEAL) {
+            forceAim(p, p.yRot, 85.0F, 3); // splash the healing potion at the player's feet
+        }
         select(p, slot);
         mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
         return true;
@@ -907,22 +1237,69 @@ public final class AiPilotEngine {
             if (!splashOnly && stack.getItem() instanceof SplashPotionItem) continue;
             if (hasPotionEffect(stack, effect)) return i;
         }
+        int inventorySlot = findPotionInventorySlot(p, effect, splashOnly);
+        return inventorySlot < 0 ? -1 : moveInventorySlotToHotbar(p, inventorySlot);
+    }
+
+    private static int findPotionInventorySlot(PlayerEntity p, Effect effect, boolean splashOnly) {
+        if (p == null || effect == null) return -1;
+        for (int i = 0; i < p.inventory.items.size(); i++) {
+            ItemStack stack = p.inventory.items.get(i);
+            if (!(stack.getItem() instanceof net.minecraft.item.PotionItem)) continue;
+            if (splashOnly && !(stack.getItem() instanceof SplashPotionItem)) continue;
+            if (!splashOnly && stack.getItem() instanceof SplashPotionItem) continue;
+            if (hasPotionEffect(stack, effect)) return i;
+        }
         return -1;
     }
 
-    private static void useRangedItem(Minecraft mc, ClientPlayerEntity p) {
-        int slot = findHotbarPotion(p, Effects.HARM, true);
-        if (slot >= 0) {
-            select(p, slot);
+    private static void useRangedItem(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+        if (t == null || !t.isAlive() || p.isUsingItem() || !p.canSee(t)) return;
+        double distance = horizontalDistance(p, t);
+        if (distance < 1.6 || distance > 24.0) return;
+
+        // Fire a preloaded crossbow immediately; otherwise load a crossbow or draw a bow.
+        int crossbowSlot = findHotbarCrossbow(p, true);
+        if (crossbowSlot >= 0) {
+            aimAtProjectileTarget(p, t);
+            select(p, crossbowSlot);
             mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
             return;
         }
-        if (useHotbarItem(mc, p, Items.SNOWBALL, Items.EGG)) return;
-        if (useHotbarItem(mc, p, Items.CROSSBOW)) {
-            rangedReleaseTick = p.tickCount + 25;
-        } else if (useHotbarItem(mc, p, Items.BOW)) {
-            rangedReleaseTick = p.tickCount + 20;
+        if (hasArrowAmmo(p)) {
+            crossbowSlot = findHotbarCrossbow(p, false);
+            if (crossbowSlot >= 0) {
+                ItemStack crossbow = p.inventory.items.get(crossbowSlot);
+                if (isCrossbowCharged(crossbow)) {
+                    aimAtProjectileTarget(p, t);
+                    select(p, crossbowSlot);
+                    mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
+                } else {
+                    aimAtProjectileTarget(p, t);
+                    select(p, crossbowSlot);
+                    mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
+                    rangedReleaseTick = p.tickCount + 25;
+                }
+                return;
+            }
+
+            int bowSlot = findHotbarSlot(p, Items.BOW);
+            if (bowSlot >= 0) {
+                aimAtProjectileTarget(p, t);
+                select(p, bowSlot);
+                mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
+                rangedReleaseTick = p.tickCount + 20;
+                return;
+            }
         }
+
+        int harmingPotion = findHotbarPotion(p, Effects.HARM, true);
+        if (harmingPotion >= 0) {
+            select(p, harmingPotion);
+            mc.gameMode.useItem(p, p.level, Hand.MAIN_HAND);
+            return;
+        }
+        useHotbarItem(mc, p, Items.SNOWBALL, Items.EGG);
     }
 
     private static int findHotbarSlot(PlayerEntity p, Item item) {
@@ -930,22 +1307,88 @@ public final class AiPilotEngine {
             ItemStack stack = p.inventory.items.get(i);
             if (!stack.isEmpty() && stack.getItem() == item) return i;
         }
+        int inventorySlot = findInventorySlot(p, item);
+        if (inventorySlot < 9) return -1;
+        return p instanceof ClientPlayerEntity
+                ? moveInventorySlotToHotbar((ClientPlayerEntity) p, inventorySlot) : -1;
+    }
+
+    private static int findInventorySlot(PlayerEntity p, Item item) {
+        if (p == null || item == null) return -1;
+        for (int i = 0; i < p.inventory.items.size(); i++) {
+            ItemStack stack = p.inventory.items.get(i);
+            if (!stack.isEmpty() && stack.getItem() == item) return i;
+        }
         return -1;
+    }
+
+    /** Move an inventory item with the vanilla SWAP click; keep the combat weapon intact. */
+    private static int moveInventorySlotToHotbar(ClientPlayerEntity p, int inventorySlot) {
+        Minecraft mc = Minecraft.getInstance();
+        if (p == null || mc.gameMode == null || p.isUsingItem()
+                || inventorySlot < 9 || inventorySlot >= p.inventory.items.size()
+                || p.containerMenu == null || p.containerMenu.containerId != 0) return -1;
+
+        int hotbarSlot = -1;
+        for (int i = 0; i < 9; i++) {
+            if (i != combatWeaponSlot && p.inventory.items.get(i).isEmpty()) {
+                hotbarSlot = i;
+                break;
+            }
+        }
+        if (hotbarSlot < 0) {
+            for (int i = 0; i < 9; i++) {
+                if (i != combatWeaponSlot && i != p.inventory.selected) {
+                    hotbarSlot = i;
+                    break;
+                }
+            }
+        }
+        if (hotbarSlot < 0) {
+            for (int i = 0; i < 9; i++) {
+                if (i != combatWeaponSlot) {
+                    hotbarSlot = i;
+                    break;
+                }
+            }
+        }
+        if (hotbarSlot < 0) return -1;
+
+        mc.gameMode.handleInventoryMouseClick(
+                p.containerMenu.containerId, inventorySlot, hotbarSlot, ClickType.SWAP, p);
+        return hotbarSlot;
     }
 
     private static int findHotbarBlock(PlayerEntity p, boolean obsidianOnly) {
         for (int i = 0; i < 9; i++) {
             ItemStack stack = p.inventory.items.get(i);
-            if (stack.isEmpty() || !(stack.getItem() instanceof BlockItem)) continue;
-            if (obsidianOnly && stack.getItem() != Items.OBSIDIAN) continue;
-            if (!obsidianOnly && (stack.getItem() == Items.OBSIDIAN || stack.getItem() == Items.COBWEB
-                    || stack.getItem() == Items.RESPAWN_ANCHOR)) continue;
-            return i;
+            if (isBuildingBlock(stack, obsidianOnly)) return i;
+        }
+        int inventorySlot = findInventoryBlockSlot(p, obsidianOnly);
+        if (inventorySlot < 9) return -1;
+        return p instanceof ClientPlayerEntity
+                ? moveInventorySlotToHotbar((ClientPlayerEntity) p, inventorySlot) : -1;
+    }
+
+    private static int findInventoryBlockSlot(PlayerEntity p, boolean obsidianOnly) {
+        if (p == null) return -1;
+        for (int i = 0; i < p.inventory.items.size(); i++) {
+            if (isBuildingBlock(p.inventory.items.get(i), obsidianOnly)) return i;
         }
         return -1;
     }
 
+    private static boolean isBuildingBlock(ItemStack stack, boolean obsidianOnly) {
+        if (stack == null || stack.isEmpty() || !(stack.getItem() instanceof BlockItem)) return false;
+        Item item = stack.getItem();
+        if (obsidianOnly) return item == Items.OBSIDIAN;
+        if (item == Items.OBSIDIAN || item == Items.COBWEB || item == Items.RESPAWN_ANCHOR
+                || item == Items.REDSTONE_BLOCK || item == Items.GLOWSTONE) return false;
+        return ((BlockItem) item).getBlock().defaultBlockState().getMaterial().blocksMotion();
+    }
+
     private static boolean placeBlockAt(Minecraft mc, ClientPlayerEntity p, BlockPos desired, Item item) {
+        if (mc.level == null || !mc.level.getBlockState(desired).isAir()) return false;
         int slot = findHotbarSlot(p, item);
         if (slot < 0 || p.isUsingItem()) return false;
         select(p, slot);
@@ -973,12 +1416,14 @@ public final class AiPilotEngine {
                 new BlockRayTraceResult(hit, face, block, false));
     }
 
-    private static void useBucketAt(Minecraft mc, ClientPlayerEntity p, Item bucket, BlockPos desired) {
+    private static boolean useBucketAt(Minecraft mc, ClientPlayerEntity p, Item bucket, BlockPos desired) {
         int slot = findHotbarSlot(p, bucket);
-        if (slot < 0 || p.isUsingItem()) return;
-        select(p, slot);
+        if (slot < 0 || p.isUsingItem()) return false;
         BlockPos support = desired.below();
-        if (!mc.level.getBlockState(support).isAir()) useOnBlock(mc, p, support, Direction.UP);
+        if (mc.level.getBlockState(support).isAir()) return false;
+        select(p, slot);
+        useOnBlock(mc, p, support, Direction.UP);
+        return true;
     }
 
     private static void placeBarricade(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
@@ -1004,20 +1449,19 @@ public final class AiPilotEngine {
         }
     }
 
-    private static void useWaterBucket(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+    private static boolean useWaterBucket(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
         double dist = horizontalDistance(p, t);
         boolean hazard = p.isOnFire()
                 || mc.level.getBlockState(p.blockPosition()).getBlock() == Blocks.LAVA
                 || mc.level.getBlockState(p.blockPosition()).getBlock() == Blocks.COBWEB;
         if (dist <= 3.4) {
-            useBucketAt(mc, p, Items.WATER_BUCKET, targetAdjacentBlock(mc, p, t));
-        } else if (hazard) {
-            useBucketAt(mc, p, Items.WATER_BUCKET, p.blockPosition());
+            return useBucketAt(mc, p, Items.WATER_BUCKET, targetAdjacentBlock(mc, p, t));
         }
+        return hazard && useBucketAt(mc, p, Items.WATER_BUCKET, p.blockPosition());
     }
 
-    private static void useWaterBucket(Minecraft mc, ClientPlayerEntity p) {
-        useBucketAt(mc, p, Items.WATER_BUCKET, p.blockPosition());
+    private static boolean useWaterBucket(Minecraft mc, ClientPlayerEntity p) {
+        return useBucketAt(mc, p, Items.WATER_BUCKET, p.blockPosition());
     }
 
     private static void placePillarBlock(Minecraft mc, ClientPlayerEntity p) {
@@ -1039,26 +1483,28 @@ public final class AiPilotEngine {
         return center;
     }
 
-    private static void useCrystalCombo(Minecraft mc, ClientPlayerEntity p, LivingEntity t, boolean pearlFirst) {
+    private static boolean useCrystalCombo(Minecraft mc, ClientPlayerEntity p,
+                                           LivingEntity t, boolean pearlFirst) {
         double dist = horizontalDistance(p, t);
         if (pearlFirst) {
             if (dist < 3.6 || dist > 12.0 || findHotbarSlot(p, Items.ENDER_PEARL) < 0
                     || findHotbarSlot(p, Items.END_CRYSTAL) < 0
-                    || findHotbarSlot(p, Items.OBSIDIAN) < 0) return;
-            useHotbarItem(mc, p, Items.ENDER_PEARL);
+                    || findHotbarSlot(p, Items.OBSIDIAN) < 0) return false;
+            if (!useHotbarItem(mc, p, Items.ENDER_PEARL)) return false;
         } else if (dist < 2.4 || dist > 5.5
                 || findHotbarSlot(p, Items.END_CRYSTAL) < 0
                 || findHotbarSlot(p, Items.OBSIDIAN) < 0) {
-            return;
+            return false;
         }
         BlockPos base = targetAdjacentBlock(mc, p, t);
-        if (!placeBlockAt(mc, p, base, Items.OBSIDIAN)) return;
+        if (!placeBlockAt(mc, p, base, Items.OBSIDIAN)) return false;
         int crystalSlot = findHotbarSlot(p, Items.END_CRYSTAL);
-        if (crystalSlot < 0) return;
+        if (crystalSlot < 0) return false;
         select(p, crystalSlot);
         useOnBlock(mc, p, base, Direction.UP);
         placedCrystalBase = base;
         crystalDetonateUntilTick = p.tickCount + 30;
+        return true;
     }
 
     private static void detonatePlacedCrystal(Minecraft mc, ClientPlayerEntity p) {
@@ -1076,31 +1522,56 @@ public final class AiPilotEngine {
         }
     }
 
-    private static void useRespawnAnchor(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+    private static boolean useRespawnAnchor(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
         double dist = horizontalDistance(p, t);
-        if (dist < 1.5 || dist > 4.8 || findHotbarSlot(p, Items.RESPAWN_ANCHOR) < 0) return;
+        if (dist < 1.5 || dist > 4.8 || p.level.dimensionType().respawnAnchorWorks()
+                || countInventoryItem(p, Items.GLOWSTONE) <= 0
+                || findHotbarSlot(p, Items.RESPAWN_ANCHOR) < 0) return false;
         BlockPos anchor = targetAdjacentBlock(mc, p, t);
-        if (!placeBlockAt(mc, p, anchor, Items.RESPAWN_ANCHOR)) return;
+        if (!placeBlockAt(mc, p, anchor, Items.RESPAWN_ANCHOR)) return false;
         int glowstone = findHotbarSlot(p, Items.GLOWSTONE);
-        if (glowstone >= 0) {
-            select(p, glowstone);
-            useOnBlock(mc, p, anchor, Direction.UP);
-            if (combatWeaponSlot >= 0) select(p, combatWeaponSlot);
-            useOnBlock(mc, p, anchor, Direction.UP);
-        }
+        if (glowstone < 0) return false;
+        select(p, glowstone);
+        useOnBlock(mc, p, anchor, Direction.UP);
+        if (combatWeaponSlot >= 0) select(p, combatWeaponSlot);
+        useOnBlock(mc, p, anchor, Direction.UP);
+        return true;
     }
 
-    private static void useTntMinecart(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
+    private static boolean useTntMinecart(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
         double dist = horizontalDistance(p, t);
-        if (dist < 3.0 || dist > 8.5 || findHotbarSlot(p, Items.RAIL) < 0
-                || findHotbarSlot(p, Items.TNT_MINECART) < 0) return;
+        if (dist < 4.0 || dist > 8.5 || countDetonatingMinecartKits(p) <= 0) return false;
+        Item powerItem = countInventoryItem(p, Items.REDSTONE_BLOCK) > 0
+                ? Items.REDSTONE_BLOCK : Items.REDSTONE_TORCH;
+        int railSlot = findHotbarSlot(p, Items.ACTIVATOR_RAIL);
+        int cartSlot = findHotbarSlot(p, Items.TNT_MINECART);
+        int powerSlot = findHotbarSlot(p, powerItem);
+        if (railSlot < 0 || cartSlot < 0 || powerSlot < 0) return false;
+
         BlockPos rail = targetAdjacentBlock(mc, p, t);
-        if (!placeBlockAt(mc, p, rail, Items.RAIL)) return;
-        int cart = findHotbarSlot(p, Items.TNT_MINECART);
-        if (cart >= 0) {
-            select(p, cart);
-            useOnBlock(mc, p, rail, Direction.UP);
+        BlockPos power = adjacentPowerPosition(mc, rail);
+        if (power == null || !placeBlockAt(mc, p, rail, Items.ACTIVATOR_RAIL)) return false;
+
+        cartSlot = findHotbarSlot(p, Items.TNT_MINECART);
+        if (cartSlot < 0) return false;
+        select(p, cartSlot);
+        useOnBlock(mc, p, rail, Direction.UP);
+
+        powerSlot = findHotbarSlot(p, powerItem);
+        if (powerSlot < 0) return false;
+        return placeBlockAt(mc, p, power, powerItem);
+    }
+
+    private static BlockPos adjacentPowerPosition(Minecraft mc, BlockPos rail) {
+        Direction[] sides = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
+        for (Direction side : sides) {
+            BlockPos candidate = rail.relative(side);
+            if (mc.level.getBlockState(candidate).isAir()
+                    && mc.level.getBlockState(candidate.below()).getMaterial().blocksMotion()) {
+                return candidate;
+            }
         }
+        return null;
     }
 
     private static void placeObsidianCage(Minecraft mc, ClientPlayerEntity p) {
@@ -1110,21 +1581,26 @@ public final class AiPilotEngine {
         for (BlockPos wall : walls) placeBlockAt(mc, p, wall, Items.OBSIDIAN);
     }
 
-    private static void breakCombo(Minecraft mc, ClientPlayerEntity p) {
+    private static void breakCombo(Minecraft mc, ClientPlayerEntity p, LivingEntity t) {
         if (playerComboTaken <= 0 || p.tickCount - lastPlayerDamageTick > 32) return;
+        boolean escaped = false;
         if (p.getOffhandItem().getItem() instanceof ShieldItem
                 || p.getMainHandItem().getItem() instanceof ShieldItem
-                || findHotbarSlot(p, Items.SHIELD) >= 0) {
-            raisePpoShield(mc, p);
-        } else if (findHotbarSlot(p, Items.WATER_BUCKET) >= 0) {
-            useWaterBucket(mc, p);
-        } else if (findHotbarSlot(p, Items.ENDER_PEARL) >= 0) {
-            useHotbarItem(mc, p, Items.ENDER_PEARL);
+                || countInventoryItem(p, Items.SHIELD) > 0) {
+            escaped = raisePpoShield(mc, p);
         }
+        if (!escaped && countInventoryItem(p, Items.WATER_BUCKET) > 0) {
+            escaped = useWaterBucket(mc, p);
+        }
+        if (!escaped && countInventoryItem(p, Items.ENDER_PEARL) > 0) {
+            escaped = useEnderPearl(mc, p, t, true);
+        }
+        if (!escaped) return;
         playerComboTaken = 0;
         lastPlayerDamageTick = p.tickCount;
         counterUntilTick = p.tickCount + 36;
         counterArmedUntilTick = 0;
+        scheduleRetreat(p, t, 12);
         inForward = -1.0F;
     }
 
@@ -1154,7 +1630,8 @@ public final class AiPilotEngine {
             double d = p.distanceTo(e);
             if (d > searchRange) continue;
             // приоритет: игроки и мобы в поле зрения, ближайшие
-            double score = d;
+            double score = horizontalDistance(p, e)
+                    + 0.15 * (e.getHealth() + e.getAbsorptionAmount());
             if (!p.canSee(e)) score += 4.0;
             if (e instanceof PlayerEntity) score -= 1.5;
             if (score < bestScore) { bestScore = score; best = e; }
@@ -1164,6 +1641,33 @@ public final class AiPilotEngine {
     }
 
     // ------------------------------------------------------------------- aim
+    private static void aimAtTargetOrForced(ClientPlayerEntity p, LivingEntity t, double dist) {
+        if (p.tickCount <= forcedAimUntilTick) {
+            p.yRot = forcedAimYaw;
+            p.xRot = forcedAimPitch;
+            p.yHeadRot = forcedAimYaw;
+            p.yBodyRot = forcedAimYaw;
+        } else {
+            aimAt(p, t, dist);
+        }
+    }
+
+    private static void forceAim(ClientPlayerEntity p, float yaw, float pitch, int holdTicks) {
+        forcedAimYaw = yaw;
+        forcedAimPitch = pitch;
+        forcedAimUntilTick = p.tickCount + holdTicks;
+        p.yRot = yaw;
+        p.xRot = pitch;
+        p.yHeadRot = yaw;
+        p.yBodyRot = yaw;
+    }
+
+    private static void scheduleRetreat(ClientPlayerEntity p, LivingEntity t, int holdTicks) {
+        if (t == null || holdTicks <= 0) return;
+        forcedRetreatTargetId = t.getId();
+        forcedRetreatUntilTick = p.tickCount + holdTicks;
+    }
+
     private static void aimAt(ClientPlayerEntity p, LivingEntity t, double dist) {
         double dx = t.getX() - p.getX();
         double dy = (t.getY() + t.getBbHeight() * 0.85) - (p.getY() + p.getEyeHeight());
@@ -1178,19 +1682,45 @@ public final class AiPilotEngine {
         p.yBodyRot = yaw;
     }
 
+    /** Aim an arrow ahead of a moving target and compensate for modest projectile drop. */
+    private static void aimAtProjectileTarget(ClientPlayerEntity p, LivingEntity t) {
+        Vector3d targetVelocity = t.getDeltaMovement();
+        double dx = t.getX() - p.getX();
+        double dz = t.getZ() - p.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        double flightTicks = Math.min(15.0, distance / 3.0);
+        double aimX = dx + targetVelocity.x * flightTicks;
+        double aimZ = dz + targetVelocity.z * flightTicks;
+        double aimY = (t.getY() + t.getBbHeight() * 0.55)
+                - (p.getY() + p.getEyeHeight())
+                + targetVelocity.y * flightTicks
+                + 0.025 * flightTicks * (flightTicks + 1.0);
+        double horizontal = Math.sqrt(aimX * aimX + aimZ * aimZ);
+        float yaw = (float) Math.toDegrees(Math.atan2(aimZ, aimX)) - 90.0F;
+        float pitch = (float) -Math.toDegrees(Math.atan2(aimY, horizontal));
+        p.yRot = yaw;
+        p.xRot = pitch;
+        p.yHeadRot = yaw;
+        p.yBodyRot = yaw;
+    }
+
     // -------------------------------------------------------------- weapons
     private static void selectBestWeapon(ClientPlayerEntity p) {
         if (p.isUsingItem()) return;
         int best = -1;
         double bestDmg = -1.0;
-        for (int i = 0; i < 9; i++) {
-            ItemStack s = p.inventory.items.get(i);
-            if (s.isEmpty()) continue;
-            Item it = s.getItem();
-            if (!(it instanceof SwordItem || it instanceof AxeItem || it instanceof TridentItem)) continue;
-            double dmg = attackDamage(s);
-            if (dmg > bestDmg) { bestDmg = dmg; best = i; }
+        for (int i = 0; i < p.inventory.items.size(); i++) {
+            ItemStack stack = p.inventory.items.get(i);
+            if (stack.isEmpty()) continue;
+            Item item = stack.getItem();
+            if (!(item instanceof SwordItem || item instanceof AxeItem || item instanceof TridentItem)) continue;
+            double damage = attackDamage(stack);
+            if (damage > bestDmg) {
+                bestDmg = damage;
+                best = i;
+            }
         }
+        if (best >= 9) best = moveInventorySlotToHotbar(p, best);
         if (best >= 0 && best != p.inventory.selected) select(p, best);
     }
 

@@ -4,8 +4,8 @@ license="MIT"
 
 [[mods]]
 modId="aipilot"
-version="1.0.0"
-displayName="AI Pilot — авто-бой"
+version="1.0.7"
+displayName="AI Pilot 7 — авто-бой"
 displayTest="IGNORE_ALL_VERSION"
 description='''
 Клиентский авто-бой для Minecraft 1.16.5 Forge.

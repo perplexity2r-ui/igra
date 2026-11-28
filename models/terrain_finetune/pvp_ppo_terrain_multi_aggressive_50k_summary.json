@@ -1,0 +1,89 @@
+{
+  "target_fights": 50000,
+  "fights": 50000,
+  "wins": 5918,
+  "losses": 43976,
+  "draws": 106,
+  "win_rate_recent_200": 0.115,
+  "opponents_min": 3,
+  "opponents_max": 8,
+  "opponents_average": 4.674,
+  "opponents_histogram": [
+    0,
+    0,
+    0,
+    15295,
+    11712,
+    8615,
+    6173,
+    4773,
+    3432
+  ],
+  "enemy_kills": 87994,
+  "terrain_mix": 1.0,
+  "player_aggression": 1.0,
+  "timesteps": 5931008,
+  "elapsed_sec": 1511.8,
+  "combos": {
+    "breaks": 5001,
+    "counters": 508,
+    "hits": 10330
+  },
+  "techniques": {
+    "block_barricade": 7315,
+    "buff_potion": 15925,
+    "cobweb_trap": 28876,
+    "combo_break": 5001,
+    "combo_counter": 508,
+    "end_crystal": 7739,
+    "ender_pearl": 24926,
+    "golden_apple": 62274,
+    "instant_heal": 75172,
+    "lava_trap": 15094,
+    "obsidian_cage": 80330,
+    "pearl_crystal": 1482,
+    "pillar_jump": 42427,
+    "ranged": 23080,
+    "respawn_anchor": 13525,
+    "shield_block": 0,
+    "tnt_minecart": 29460,
+    "water_bucket": 6685,
+    "wtap_combo": 13592
+  },
+  "terrain_blocked_steps": 2619390,
+  "pit_blocked_steps": 82536,
+  "other_enemy_terrain_blocked_steps": 3011307,
+  "other_enemy_pit_blocked_steps": 237276,
+  "evaluation": {
+    "seed": 6061,
+    "skill": 1.0,
+    "terrain_mix": 1.0,
+    "deterministic": true,
+    "initial_episodes_per_group": 100,
+    "initial_before_aoe_patch": {
+      "3": {"wins": 6, "losses": 94, "draws": 0},
+      "8": {"wins": 0, "losses": 100, "draws": 0}
+    },
+    "post_aoe_patch_episodes_per_group": 200,
+    "post_aoe_patch": {
+      "3": {"wins": 10, "losses": 188, "draws": 2},
+      "8": {"wins": 0, "losses": 200, "draws": 0}
+    }
+  },
+  "aoe_correction_diagnostic": {
+    "fights": 10000,
+    "model": "pvp_ppo_terrain_multi_aggressive_aoe_10k.zip",
+    "training": {"wins": 1485, "losses": 8491, "draws": 24},
+    "training_opponents_average": 4.591,
+    "aoe_enemy_hits": 7608,
+    "aoe_enemy_kills": 31,
+    "seed": 6061,
+    "episodes_per_group": 200,
+    "groups": {
+      "3": {"wins": 38, "losses": 160, "draws": 2},
+      "5": {"wins": 14, "losses": 186, "draws": 0},
+      "8": {"wins": 1, "losses": 199, "draws": 0}
+    },
+    "note": "Diagnostic follow-up, not included in the 50,000-fight training total; it still loses heavily."
+  }
+}

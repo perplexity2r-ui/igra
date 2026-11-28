@@ -16,8 +16,8 @@ loadouts (`avoid_weapon_idx`, `avoid_armor_idx`, `avoid_ranged_idx`):
     `water_bucket` (0..1, extinguishes fire, clears cobwebs/lava, and pushes enemy back).
   - Off-hand `shield` OR `totem_of_undying` (auto-pops on lethal hit: restores HP + Absorption + Regen!).
   - Random consumables: healing items (`golden_apple` + `splash_heal` / stews / foods), `ender_pearl`,
-    `buff_potion` (Speed II + Strength), and asymmetric projectiles (`snowball`, `egg`, `crossbow`,
-    `splash_harming`).
+    `buff_potion` (Speed II + Strength), and asymmetric projectiles (`snowball`, `egg`, `bow`,
+    `crossbow`, `splash_harming`).
 """
 from __future__ import annotations
 
@@ -91,14 +91,19 @@ class RangedSpec:
     knockback: float
     slow_sec: float
     pierces_armor: bool
+    max_range: float = 16.0
+    charge_sec: float = 0.0
 
 
 RANGED_TYPES: tuple[RangedSpec, ...] = (
     RangedSpec(0, "snowball", 4, 12, 0.5, 5.2, 0.8, False),
     RangedSpec(1, "egg", 4, 12, 0.5, 5.2, 0.8, False),
-    RangedSpec(2, "crossbow", 1, 3, 7.0, 3.8, 3.5, False),
+    RangedSpec(2, "crossbow", 1, 3, 7.0, 0.0, 0.0, False, 24.0, 1.25),
     RangedSpec(3, "splash_harming", 1, 2, 6.0, 1.5, 1.5, True),
+    RangedSpec(4, "bow", 1, 3, 6.5, 0.0, 0.0, False, 24.0, 1.0),
 )
+# Arrow weapons are deliberately common enough for the shared ranged action to learn both.
+RANGED_LOADOUT_WEIGHTS = np.asarray([0.12, 0.08, 0.34, 0.08, 0.38], dtype=np.float64)
 
 
 @dataclass
@@ -139,6 +144,9 @@ class BotState:
     pillar_timer: float = 0.0
     pearl_cd: float = 0.0
     use_lock: float = 0.0
+    ranged_charge: float = 0.0
+    ranged_loaded: bool = False
+    has_ranged_weapon: bool = False
 
     @property
     def summary(self) -> str:
@@ -198,6 +206,13 @@ class SimulatedPvPEnv(gym.Env):
             idx += 1
         return idx
 
+    def _pick_ranged_different(self, avoid: int) -> int:
+        weights = RANGED_LOADOUT_WEIGHTS.copy()
+        if 0 <= avoid < len(weights):
+            weights[avoid] = 0.0
+        weights /= weights.sum()
+        return int(self.np_random.choice(len(RANGED_TYPES), p=weights))
+
     def _roll_loadout(
         self,
         pos: np.ndarray,
@@ -211,7 +226,7 @@ class SimulatedPvPEnv(gym.Env):
         else:
             w_idx = self._pick_different(len(MELEE_POOL), avoid_weapon)
         a_idx = self._pick_different(len(ARMOR_TIERS), avoid_armor)
-        r_idx = self._pick_different(len(RANGED_TYPES), avoid_ranged)
+        r_idx = self._pick_ranged_different(avoid_ranged)
 
         weapon = MELEE_POOL[w_idx]
         armor = ARMOR_TIERS[a_idx]
@@ -259,6 +274,7 @@ class SimulatedPvPEnv(gym.Env):
             pearls=pearls,
             buffs=buffs,
             ranged=ranged,
+            has_ranged_weapon=(ranged > 0 and ranged_spec.ranged_id in ("bow", "crossbow")),
             pos=pos.copy(),
             vel=np.zeros(2, dtype=np.float64),
         )
@@ -295,6 +311,17 @@ class SimulatedPvPEnv(gym.Env):
         dist = math.hypot(dx, dz)
         l_speed = float(np.linalg.norm(L.vel)) * 0.05
         e_speed = float(np.linalg.norm(E.vel)) * 0.05
+        ranged_feature = float(np.clip((L.buffs + L.ranged) / 12.0, 0.0, 0.60))
+        if (L.has_ranged_weapon and L.ranged_spec.ranged_id == "bow"
+                and L.ranged > 0):
+            ranged_feature = 0.75
+        elif (L.has_ranged_weapon and L.ranged_spec.ranged_id == "crossbow"
+                and (L.ranged > 0 or L.ranged_loaded)):
+            ranged_feature = 0.85
+        if L.ranged_loaded:
+            ranged_feature = 1.10
+        if L.ranged_charge > 0.0:
+            ranged_feature = 1.25
 
         obs = np.array(
             [
@@ -316,7 +343,7 @@ class SimulatedPvPEnv(gym.Env):
                 np.clip(L.gaps / 5.0, 0.0, 1.0),
                 np.clip(L.splashes / 5.0, 0.0, 1.0),
                 np.clip(L.pearls / 4.0, 0.0, 1.0),
-                np.clip((L.buffs + L.ranged) / 12.0, 0.0, 1.0),
+                ranged_feature,
                 1.0 if (L.has_shield and L.shield_up and L.shield_disabled <= 0.0) else 0.0,
                 1.0 if (E.has_shield and E.shield_up and E.shield_disabled <= 0.0) else 0.0,
                 np.clip(L.blocks / 24.0, 0.0, 1.0),
@@ -352,6 +379,26 @@ class SimulatedPvPEnv(gym.Env):
         target.absorption = max(0.0, target.absorption - used_abs) if not totem_popped else target.absorption
         total_lost = max(0.0, used_abs + max(0.0, old_hp - new_hp))
         return total_lost, totem_popped
+
+    def _fire_ranged(self, shooter: BotState, target: BotState) -> tuple[float, bool, bool, bool]:
+        """Release one projectile; returns (damage, totem, hit, shield_blocked)."""
+        spec = shooter.ranged_spec
+        delta = target.pos - shooter.pos
+        distance = float(np.linalg.norm(delta))
+        direction = delta / distance if distance > 1e-6 else np.array([0.0, 1.0])
+        valid = 1.6 <= distance <= spec.max_range and not self._has_cover_between(
+            shooter.pos, target.pos
+        )
+        blocked = (valid and target.has_shield and target.shield_up
+                   and target.shield_disabled <= 0.0 and not spec.pierces_armor)
+        if not valid or blocked:
+            return 0.0, False, False, bool(blocked)
+        dealt, popped = self._apply_bot_damage(
+            target, spec.damage, bypass_armor=spec.pierces_armor
+        )
+        target.slow_timer = max(target.slow_timer, spec.slow_sec)
+        target.vel = target.vel + direction * spec.knockback
+        return dealt, popped, dealt > 0.0, False
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
@@ -406,6 +453,7 @@ class SimulatedPvPEnv(gym.Env):
 
         L = self.learner
         E = self.enemy
+        ranged_busy_at_start = L.ranged_charge > 0.0
 
         vec = E.pos - L.pos
         dist = float(np.linalg.norm(vec))
@@ -435,6 +483,11 @@ class SimulatedPvPEnv(gym.Env):
         healed = 0.0
         damage_dealt = 0.0
         damage_taken = 0.0
+        ranged_charge_started = False
+        bow_shot = False
+        crossbow_shot = False
+        bow_hit = False
+        crossbow_hit = False
 
         L.shield_up = False
 
@@ -472,7 +525,7 @@ class SimulatedPvPEnv(gym.Env):
             want_attack = True
         elif act == 12:
             # Raise Shield (requires having a shield in random loadout!)
-            if L.has_shield and L.shield_disabled <= 0.0:
+            if L.has_shield and L.shield_disabled <= 0.0 and L.ranged_charge <= 0.0:
                 L.shield_up = True
                 move_dir = -fwd * 0.45
             else:
@@ -509,7 +562,7 @@ class SimulatedPvPEnv(gym.Env):
                 wasted_consumable = True
         elif act == 15:
             # Ender Pearl blink
-            if L.pearls > 0 and L.pearl_cd <= 0.0:
+            if L.pearls > 0 and L.pearl_cd <= 0.0 and L.ranged_charge <= 0.0:
                 L.pearls -= 1
                 L.pearl_cd = 1.5
                 L.cobweb_timer = 0.0
@@ -539,26 +592,52 @@ class SimulatedPvPEnv(gym.Env):
             else:
                 wasted_consumable = True
         elif act == 17:
-            # Asymmetric Ranged Item (snowball / egg / crossbow / splash_harming)
-            if L.ranged > 0 and L.use_lock <= 0.0:
-                spec = L.ranged_spec
-                if dist < 1.8 or dist > 16.0:
-                    wasted_consumable = True
-                L.ranged -= 1
-                L.use_lock = 0.15
-                used_consumable = spec.ranged_id
-                if 1.6 <= dist <= 16.0 and not self._has_cover_between(L.pos, E.pos):
-                    if E.has_shield and E.shield_up and E.shield_disabled <= 0.0 and not spec.pierces_armor:
-                        pass
+            # The Forge navigation assist allows shooting/loading while advancing.
+            # Preserve that same forward pressure outside melee reach.
+            if dist > 3.0:
+                move_dir = fwd
+            # Generic projectiles fire immediately; bows draw and crossbows load first.
+            spec = L.ranged_spec
+            if L.use_lock <= 0.0 and L.ranged_charge <= 0.0:
+                valid_target = (1.6 <= dist <= spec.max_range
+                                and not self._has_cover_between(L.pos, E.pos))
+                if spec.ranged_id == "bow":
+                    if L.ranged > 0 and valid_target:
+                        L.ranged_charge = spec.charge_sec
+                        L.use_lock = spec.charge_sec
+                        ranged_charge_started = True
                     else:
-                        dealt, e_pop = self._apply_bot_damage(
-                            E, spec.damage, bypass_armor=spec.pierces_armor
-                        )
-                        damage_dealt += dealt
+                        wasted_consumable = True
+                elif spec.ranged_id == "crossbow" and L.ranged_loaded:
+                    if valid_target:
+                        L.ranged_loaded = False
+                        L.use_lock = 0.15
+                        damage, e_pop, crossbow_hit, blocked = self._fire_ranged(L, E)
+                        damage_dealt += damage
                         totem_popped_enemy = totem_popped_enemy or e_pop
-                        E.slow_timer = max(E.slow_timer, spec.slow_sec)
-                        E.vel = E.vel + fwd * spec.knockback
-            else:
+                        blocked_hit = blocked_hit or blocked
+                        crossbow_shot = True
+                        used_consumable = "crossbow"
+                    else:
+                        wasted_consumable = True
+                elif spec.ranged_id == "crossbow":
+                    if L.ranged > 0 and valid_target:
+                        L.ranged_charge = spec.charge_sec
+                        L.use_lock = spec.charge_sec
+                        ranged_charge_started = True
+                    else:
+                        wasted_consumable = True
+                elif L.ranged > 0 and valid_target:
+                    L.ranged -= 1
+                    L.use_lock = 0.15
+                    damage, e_pop, hit, blocked = self._fire_ranged(L, E)
+                    damage_dealt += damage
+                    totem_popped_enemy = totem_popped_enemy or e_pop
+                    blocked_hit = blocked_hit or blocked
+                    used_consumable = spec.ranged_id
+                else:
+                    wasted_consumable = True
+            elif L.use_lock <= 0.0 and L.ranged_charge <= 0.0:
                 wasted_consumable = True
         elif act == 18:
             # Place Tactical Block Barricade / Pillar cover between Learner and Enemy
@@ -651,20 +730,23 @@ class SimulatedPvPEnv(gym.Env):
         e_move = np.zeros(2, dtype=np.float64)
         e_speed = walk_speed * e_speed_mult
         E.shield_up = False
-        enemy_acted_utility = False
+        enemy_acted_utility = E.ranged_charge > 0.0
 
-        if (E.fire_timer > 1.0 or E.cobweb_timer > 0.5) and E.water_buckets > 0 and float(self.np_random.random()) < 0.45:
+        if (E.ranged_charge <= 0.0 and (E.fire_timer > 1.0 or E.cobweb_timer > 0.5)
+                and E.water_buckets > 0 and float(self.np_random.random()) < 0.45):
             E.water_buckets -= 1
             E.fire_timer = 0.0
             E.lava_timer = 0.0
             E.cobweb_timer = 0.0
             enemy_acted_utility = True
-        elif E.hp <= 12.0 and E.splashes > 0 and float(self.np_random.random()) < 0.35:
+        elif (E.ranged_charge <= 0.0 and E.hp <= 12.0 and E.splashes > 0
+              and float(self.np_random.random()) < 0.35):
             E.splashes -= 1
             E.hp = min(20.0, E.hp + 7.5)
             enemy_acted_utility = True
         elif (
-            E.hp <= 14.0
+            E.ranged_charge <= 0.0
+            and E.hp <= 14.0
             and E.blocks >= 2
             and dist < 4.5
             and len(self.obstacles) < 6
@@ -676,7 +758,8 @@ class SimulatedPvPEnv(gym.Env):
             e_move = -e_fwd * 0.8
             enemy_acted_utility = True
         elif (
-            E.hp <= 15.0
+            E.ranged_charge <= 0.0
+            and E.hp <= 15.0
             and E.gaps > 0
             and E.regen_timer <= 0.0
             and (dist > 2.8 or self._has_cover_between(L.pos, E.pos))
@@ -686,21 +769,25 @@ class SimulatedPvPEnv(gym.Env):
             E.regen_timer = 5.0
             E.absorption = 4.0
             enemy_acted_utility = True
-        elif E.cobwebs > 0 and dist <= 3.8 and L.cobweb_timer <= 0.0 and float(self.np_random.random()) < 0.24:
+        elif (E.ranged_charge <= 0.0 and E.cobwebs > 0 and dist <= 3.8
+              and L.cobweb_timer <= 0.0 and float(self.np_random.random()) < 0.24):
             E.cobwebs -= 1
             L.cobweb_timer = 2.6
             enemy_acted_utility = True
-        elif E.lava_buckets > 0 and 2.1 <= dist <= 4.0 and float(self.np_random.random()) < 0.20:
+        elif (E.ranged_charge <= 0.0 and E.lava_buckets > 0 and 2.1 <= dist <= 4.0
+              and float(self.np_random.random()) < 0.20):
             E.lava_buckets -= 1
             L.lava_timer = 1.6
             L.fire_timer = max(L.fire_timer, 3.5)
             enemy_acted_utility = True
-        elif E.buffs > 0 and E.buff_timer <= 0.0 and dist > 4.2 and float(self.np_random.random()) < 0.24:
+        elif (E.ranged_charge <= 0.0 and E.buffs > 0 and E.buff_timer <= 0.0
+              and dist > 4.2 and float(self.np_random.random()) < 0.24):
             E.buffs -= 1
             E.buff_timer = 15.0
             enemy_acted_utility = True
         elif (
-            E.pearls > 0
+            E.ranged_charge <= 0.0
+            and E.pearls > 0
             and E.pearl_cd <= 0.0
             and dist > 7.0
             and E.hp > 12.0
@@ -764,6 +851,8 @@ class SimulatedPvPEnv(gym.Env):
         self.obstacles = [
             (op, ttl - self.DT) for (op, ttl) in self.obstacles if ttl - self.DT > 0.0
         ]
+        learner_was_charging = L.ranged_charge > 0.0
+        enemy_was_charging = E.ranged_charge > 0.0
         for b in (L, E):
             b.cd = max(0.0, b.cd - self.DT)
             b.hurt_cd = max(0.0, b.hurt_cd - self.DT)
@@ -774,6 +863,36 @@ class SimulatedPvPEnv(gym.Env):
             b.pillar_timer = max(0.0, b.pillar_timer - self.DT)
             b.pearl_cd = max(0.0, b.pearl_cd - self.DT)
             b.use_lock = max(0.0, b.use_lock - self.DT)
+            b.ranged_charge = max(0.0, b.ranged_charge - self.DT)
+            if b.ranged_charge < 1e-6:
+                b.ranged_charge = 0.0
+
+        if learner_was_charging and L.ranged_charge <= 0.0:
+            if L.ranged_spec.ranged_id == "bow" and L.ranged > 0:
+                L.ranged -= 1
+                bow_shot = True
+                damage, e_pop, bow_hit, blocked = self._fire_ranged(L, E)
+                damage_dealt += damage
+                totem_popped_enemy = totem_popped_enemy or e_pop
+                blocked_hit = blocked_hit or blocked
+                used_consumable = "bow"
+                self.consumables_used["bow"] = self.consumables_used.get("bow", 0) + 1
+            elif L.ranged_spec.ranged_id == "crossbow" and L.ranged > 0:
+                L.ranged -= 1
+                L.ranged_loaded = True
+
+        if enemy_was_charging and E.ranged_charge <= 0.0:
+            if E.ranged_spec.ranged_id == "crossbow" and E.ranged > 0:
+                E.ranged -= 1
+                E.ranged_loaded = True
+                enemy_acted_utility = True
+            elif E.ranged_spec.ranged_id == "bow" and E.ranged > 0:
+                E.ranged -= 1
+                damage, l_pop, _, blocked = self._fire_ranged(E, L)
+                damage_taken += damage
+                totem_popped_learner = totem_popped_learner or l_pop
+                blocked_hit = blocked_hit or blocked
+                enemy_acted_utility = True
 
         # Regeneration ticks
         if L.regen_timer > 0.0:
@@ -856,6 +975,7 @@ class SimulatedPvPEnv(gym.Env):
             and re_dist < 3.25
             and not cover_blocking_after
             and E.cd <= 0.0
+            and E.use_lock <= 0.0
             and float(self.np_random.random()) < 0.72
         ):
             if L.has_shield and L.shield_up and L.shield_disabled <= 0.0:
@@ -879,26 +999,35 @@ class SimulatedPvPEnv(gym.Env):
             E.cd = E.weapon.cooldown
         elif (
             not enemy_acted_utility
-            and E.ranged > 0
-            and 4.5 <= re_dist <= 13.5
+            and (E.ranged > 0 or E.ranged_loaded)
+            and 4.5 <= re_dist <= E.ranged_spec.max_range
+            and not cover_blocking_after
             and E.cd <= 0.0
+            and E.use_lock <= 0.0
             and float(self.np_random.random()) < 0.22
         ):
-            E.ranged -= 1
-            E.cd = 0.9
-            if cover_blocking_after:
-                # Learner's placed block barricade absorbed the enemy's projectile!
-                blocked_hit = True
-            elif L.has_shield and L.shield_up and L.shield_disabled <= 0.0 and not E.ranged_spec.pierces_armor:
-                blocked_hit = True
-            else:
-                taken, l_pop = self._apply_bot_damage(
-                    L, E.ranged_spec.damage, bypass_armor=E.ranged_spec.pierces_armor
-                )
+            spec = E.ranged_spec
+            if spec.ranged_id == "crossbow" and E.ranged_loaded:
+                E.ranged_loaded = False
+                E.use_lock = 0.15
+                E.cd = 0.15
+                taken, l_pop, _, blocked = self._fire_ranged(E, L)
                 damage_taken += taken
                 totem_popped_learner = totem_popped_learner or l_pop
-                L.slow_timer = max(L.slow_timer, E.ranged_spec.slow_sec)
-                L.vel = L.vel - hit_dir * E.ranged_spec.knockback
+                blocked_hit = blocked_hit or blocked
+                enemy_acted_utility = True
+            elif spec.ranged_id in ("bow", "crossbow"):
+                E.ranged_charge = spec.charge_sec
+                E.use_lock = spec.charge_sec
+                enemy_acted_utility = True
+            else:
+                E.ranged -= 1
+                E.use_lock = 0.15
+                E.cd = 0.9
+                taken, l_pop, _, blocked = self._fire_ranged(E, L)
+                damage_taken += taken
+                totem_popped_learner = totem_popped_learner or l_pop
+                blocked_hit = blocked_hit or blocked
 
         learner_dead = L.hp <= self.DEATH_HP_THRESHOLD
         enemy_dead = E.hp <= self.DEATH_HP_THRESHOLD
@@ -908,6 +1037,8 @@ class SimulatedPvPEnv(gym.Env):
         truncated = bool(timeout and not terminated)
 
         obs = self._get_obs()
+        if ranged_busy_at_start:
+            wasted_consumable = False
 
         reward = -0.01
         reward += damage_dealt * 2.5
@@ -922,6 +1053,12 @@ class SimulatedPvPEnv(gym.Env):
             reward += 3.0
         if tactical_cover:
             reward += 2.0
+        if ranged_charge_started:
+            reward += 4.0
+        if bow_shot or crossbow_shot:
+            reward += 4.0
+        if bow_hit or crossbow_hit:
+            reward += 8.0
         if wasted_consumable:
             reward -= 1.5
 
@@ -951,6 +1088,11 @@ class SimulatedPvPEnv(gym.Env):
             "wasted_consumable": wasted_consumable,
             "shield_broken": shield_broken,
             "blocked_hit": blocked_hit,
+            "ranged_charge_started": ranged_charge_started,
+            "bow_shot": bow_shot,
+            "crossbow_shot": crossbow_shot,
+            "bow_hit": bow_hit,
+            "crossbow_hit": crossbow_hit,
             "trapped_enemy": trapped_enemy,
             "tactical_cover": tactical_cover,
             "totem_popped_learner": totem_popped_learner,

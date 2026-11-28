@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export the terrain-aware deterministic PPO actor for the Forge client.
+"""Export the multi-opponent terrain PPO actor for the Forge client.
 
 The Forge client runs inference with a tiny pure-Java MLP, so it does not need
 Python, PyTorch, or Stable-Baselines3 at runtime. Re-run this after fine-tuning.
@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 from stable_baselines3 import PPO
 
-OBS_DIM = 44
+OBS_DIM = 52
 HIDDEN_1 = 192
 HIDDEN_2 = 192
 ACTION_DIM = 30
@@ -28,7 +28,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=Path,
-        default=root / "models" / "terrain_finetune" / "pvp_ppo_terrain_10k.zip",
+        default=root / "models" / "terrain_finetune" / "pvp_ppo_terrain_multi_aggressive_pressure_seed.zip",
         help="Stable-Baselines3 PPO .zip model",
     )
     parser.add_argument(

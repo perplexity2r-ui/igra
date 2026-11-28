@@ -21,11 +21,32 @@ The opponent skill and combo-start curriculum ramped during training, so the ful
 
 The same seeded terrain distribution was used in both runs (21 wall, 26 pit, 29 hill, 24 mixed maps). This is a simulator comparison, not a guarantee of performance on a Minecraft server; the hard fixed-skill benchmark remains challenging.
 
-## Forge export
+## One-versus-many continuation
 
-The actor was exported to `forge-mod/src/main/resources/com/arena/aipilot/ppo_policy.bin`.
-`forge-mod/tools/verify_ppo_weights.py --samples 2048` passed: maximum logit error `3.8146973e-06`, zero action mismatches. Resource SHA-256:
+The verified 48-feature AoE checkpoint is the reference baseline; it was trained for
+exactly 50,000 fights after a separate 10,000-fight AoE diagnostic. At skill 1.0, its
+independent 200-fight checks won 58/200 against three opponents, 30/200 against four,
+22/200 against five, 12/200 against six, 4/200 against seven, and 1/200 against eight.
+The 52-feature crowd-bearing continuation won 63, 34, 23, 9, 2, and 1 fights against
+groups of three through eight, respectively. It had five more wins overall across the
+six groups, but regressed against groups of six and seven and tied at eight. Neither
+model wins consistently across all group sizes. Seven more exact 50,000-fight
+refinements (hard-crowd sampling, target focus, win/death shaping, weighted-group
+continuation, full-difficulty training, 50-feature threat positions, and 52-feature
+crowd-bearing) have failed to produce stable wins. The full iteration table is in
+[`multi_opponent_iterations.md`](multi_opponent_iterations.md).
 
-`91b2c436f3a3ac14a3fbbcefd4fffaa61c4d718ead7fbcda9adfa3bbc7f9cc49`
+## Forge export and runtime
 
-The Forge Java source now expects 44 observations and includes obstacle-aware pursuit plus the K-key style panel. **The Forge JAR was not rebuilt in this environment**: Java, `javac`, Gradle, and a Gradle wrapper are absent. The existing JAR therefore remains the old build until it is rebuilt with the 1.16.5 Forge toolchain.
+The trained policy has 52 inputs. Its four new threat/crowd-direction columns were
+zero-initialized in the warm-start seed, preserving the original 48-feature logits
+exactly at initialization (512-observation comparison: zero max delta, zero action
+mismatches). The final trained actor was exported and verified on 2,048 52-feature
+observations with max logit error `3.8146973e-06` and zero action mismatches. Resource
+SHA-256:
+
+`f1391f903942bbc3f3dd6dba2a10f292626f25893eb4c4b72e714f95584e12be`
+
+Forge CI must rebuild both ForgeGradle variants with these final weights. Live
+Minecraft multi-opponent performance remains unverified, and Python explosive splash
+still differs from Forge runtime behavior.

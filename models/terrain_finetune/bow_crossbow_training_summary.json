@@ -1,0 +1,87 @@
+{
+  "checkpoint": "models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_bow_crossbow_25k_bc30.zip",
+  "initial_checkpoint": "models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_pressure_50k.zip",
+  "ppo_finetuning": [
+    {
+      "seed": 20261129,
+      "target_fights": 5000,
+      "completed_fights": 5011,
+      "bow_shots": 450,
+      "bow_hits": 364,
+      "crossbow_shots": 73,
+      "crossbow_hits": 72,
+      "reward_schedule": "initial ranged bonuses"
+    },
+    {
+      "seed": 20261130,
+      "target_fights": 10000,
+      "completed_fights": 10215,
+      "bow_shots": 989,
+      "bow_hits": 808,
+      "crossbow_shots": 190,
+      "crossbow_hits": 189,
+      "reward_schedule": "charge start +4, shot +4, contact +8"
+    },
+    {
+      "seed": 20261201,
+      "target_fights": 10000,
+      "completed_fights": 10151,
+      "bow_shots": 1123,
+      "bow_hits": 918,
+      "crossbow_shots": 256,
+      "crossbow_hits": 256,
+      "reward_schedule": "charge start +4, shot +4, contact +8; ammo-aware observation"
+    }
+  ],
+  "behavior_cloning": {
+    "epochs": 30,
+    "bow_positive_examples": 10000,
+    "crossbow_positive_examples": 10000,
+    "teacher_examples": 20000,
+    "seed": 20261201,
+    "teacher_weight": 2.0,
+    "learning_rate": 0.0001,
+    "terrain_mix": 0.5,
+    "labels": "action 17 in valid ranged contexts; original actor's deterministic action elsewhere"
+  },
+  "deterministic_evaluation": {
+    "seed": 6069,
+    "fights": 1000,
+    "terrain_mix": 0.5,
+    "opponents": [3, 8],
+    "enemy_skill": 1.0,
+    "enemy_aggression": 1.0,
+    "player_aggression": 1.0,
+    "candidate": {
+      "wins": 69,
+      "losses": 931,
+      "draws": 0,
+      "bow_shots": 531,
+      "bow_hits": 323,
+      "crossbow_shots": 358,
+      "crossbow_hits": 356,
+      "action_17_count": 23743,
+      "action_17_decisions": 124544
+    },
+    "baseline_same_seed": {
+      "wins": 62,
+      "losses": 937,
+      "draws": 1,
+      "bow_shots": 0,
+      "crossbow_shots": 0,
+      "ranged_tech": 0
+    },
+    "note": "Ranged use is confirmed; this single-seed run is not enough to establish a win-rate improvement."
+  },
+  "export": {
+    "resource": "forge-mod/src/main/resources/com/arena/aipilot/ppo_policy.bin",
+    "sha256": "8720f8cc53e730a622d38265fd19ec0a9575b1c8014932d315013d46b19628fe",
+    "verification_observations": 8192,
+    "max_logit_delta": 0.0000057220459,
+    "action_mismatches": 0
+  },
+  "unverified": [
+    "Forge Java source was built by GitHub Actions, but not compiled in this local sandbox.",
+    "No live Minecraft server test was run."
+  ]
+}

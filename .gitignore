@@ -31,6 +31,14 @@ logs/*.log.gz
 # PRO and builder training checkpoints
 models/pro_checkpoints/
 models/terrain_finetune/pro_checkpoints/
+models/terrain_finetune/pvp_ppo_terrain_aggressive_50k.zip
+models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_*.zip
+models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_*_status.json
+models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_*_checkpoints/
+models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_10k_summary.json
+models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_aoe_hardmix_50k_summary.json
+models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_targetfocus_50k_summary.json
+models/terrain_finetune/pvp_ppo_terrain_multi_aggressive_survival_50k_summary.json
 models/builder/checkpoints/
 models/builder_6m/checkpoints/
 

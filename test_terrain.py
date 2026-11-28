@@ -69,6 +69,21 @@ def test_hills_feed_height_and_slope_sensors():
     assert features[9] > 0.0, "uphill slope should be observable"
 
 
+def test_max_player_aggression_rewards_closing_distance():
+    neutral = ProArena(16, seed=31)
+    aggressive = ProArena(16, seed=31)
+    aggressive.set_player_aggression(1.0)
+    actions = np.ones(16, dtype=np.int32)  # forward pursuit is the positive-control action
+    _, neutral_reward, *_ = neutral.step(actions)
+    _, aggressive_reward, *_ = aggressive.step(actions)
+    assert np.all(aggressive_reward >= neutral_reward)
+    assert np.any(aggressive_reward > neutral_reward)
+
+    vec = ProPvPVecEnv(2, seed=32)
+    vec.set_player_aggression(1.0)
+    assert vec.core.player_aggression == 1.0
+
+
 def test_enemy_skill_setter_changes_the_skill_used_by_the_brain():
     arena = ProArena(4, seed=13)
     arena.set_enemy_skill(0.27)

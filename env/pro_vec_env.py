@@ -22,7 +22,7 @@ import gymnasium as gym
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import VecEnv
 
-from .sim_env import ARMOR_TIERS, BLOCK_TYPES, MELEE_POOL, RANGED_TYPES
+from .sim_env import ARMOR_TIERS, BLOCK_TYPES, MELEE_POOL, RANGED_LOADOUT_WEIGHTS, RANGED_TYPES
 from .combat_terrain import CombatTerrain, TERRAIN_SENSOR_COUNT
 
 N_ACTIONS = 30
@@ -48,6 +48,11 @@ RANGED_DMG = np.array([r.damage for r in RANGED_TYPES], dtype=np.float32)
 RANGED_KB = np.array([r.knockback for r in RANGED_TYPES], dtype=np.float32)
 RANGED_SLOW = np.array([r.slow_sec for r in RANGED_TYPES], dtype=np.float32)
 RANGED_PIERCE = np.array([1.0 if r.pierces_armor else 0.0 for r in RANGED_TYPES], dtype=np.float32)
+RANGED_CHARGE = np.array([r.charge_sec for r in RANGED_TYPES], dtype=np.float32)
+RANGED_MAX_RANGE = np.array([r.max_range for r in RANGED_TYPES], dtype=np.float32)
+RANGED_ACTION_LOCK = np.full(len(RANGED_TYPES), 0.15, dtype=np.float32)
+RANGED_BOW_INDEX = next(i for i, r in enumerate(RANGED_TYPES) if r.ranged_id == "bow")
+RANGED_CROSSBOW_INDEX = next(i for i, r in enumerate(RANGED_TYPES) if r.ranged_id == "crossbow")
 
 # technique ids recorded for logging
 TECHNIQUES = [
@@ -59,6 +64,7 @@ TECHNIQUES = [
 T_GAP, T_HEAL, T_PEARL, T_BUFF, T_RANGED = 1, 2, 3, 4, 5
 T_BARRICADE, T_COBWEB, T_LAVA, T_WATER, T_PILLAR = 6, 7, 8, 9, 10
 T_CRYSTAL, T_ANCHOR, T_MINECART, T_CAGE, T_WTAP, T_PEARL_CRYSTAL = 11, 12, 13, 14, 15, 16
+T_SHIELD = 17
 T_COMBO_BREAK, T_COMBO_COUNTER = 18, 19
 A_COMBO_BREAK, A_COMBO_COUNTER = 28, 29
 
@@ -109,6 +115,9 @@ class BotArrays:
         self.pearls = np.zeros(n, f)
         self.buffs = np.zeros(n, f)
         self.ranged = np.zeros(n, f)
+        self.ranged_charge = np.zeros(n, f)
+        self.ranged_loaded = np.zeros(n, bool)
+        self.has_ranged_weapon = np.zeros(n, bool)
         self.crystals = np.zeros(n, f)
         self.anchors = np.zeros(n, f)
         self.minecarts = np.zeros(n, f)
@@ -126,6 +135,8 @@ class BotArrays:
         self.escape_cd = np.zeros(n, f)      # cooldown on combo_break
         self.counter_until = np.zeros(n, f)  # window to punish right after escaping
         self.counter_armed = np.zeros(n, f)  # buffered counter request (fires on cooldown)
+        self.crit_armed = np.zeros(n, bool)  # action 9 queues a jump-crit for the falling window
+        self.crit_window = np.zeros(n, f)
 
         # manual overrides (set for a human-controlled player)
         self.force_weapon = np.full(n, -1, np.int32)
@@ -167,9 +178,10 @@ class BotArrays:
             self.cd, self.hurt_cd, self.regen, self.buff, self.fire, self.slow, self.web,
             self.lava, self.pillar, self.pearl_cd, self.use_lock, self.shield_disabled,
             self.stun, self.combo_window, self.escape_cd, self.counter_until, self.counter_armed,
-            self.y, self.vy, self.blocks, self.cobwebs, self.lava_bk, self.water_bk,
+            self.crit_window, self.y, self.vy, self.blocks, self.cobwebs, self.lava_bk, self.water_bk,
             self.gaps, self.splashes, self.pearls, self.buffs, self.ranged,
-            self.crystals, self.anchors, self.minecarts, self.obsidian, self.cage_until,
+            self.ranged_charge, self.crystals, self.anchors, self.minecarts, self.obsidian,
+            self.cage_until,
         ):
             arr[mask] = 0.0
         self.hp[mask] = 20.0
@@ -178,6 +190,9 @@ class BotArrays:
         self.shield_held[mask] = False
         self.has_shield[mask] = False
         self.has_totem[mask] = False
+        self.ranged_loaded[mask] = False
+        self.has_ranged_weapon[mask] = False
+        self.crit_armed[mask] = False
         self.vel[mask] = 0.0
         self.force_weapon[mask] = -1
         self.force_armor[mask] = -1
@@ -218,7 +233,8 @@ class ProArena:
         self._human_broke = np.zeros(self.n, bool)     # pve: human escaped an AI chain
         self._human_countered = np.zeros(self.n, bool)  # pve: human landed a counter
         self.pve = False
-        self.e_aggression = 0.0   # 0 = normal pro, 1 = relentless combo pressure
+        self.e_aggression = 0.0   # scripted opponent pressure
+        self.player_aggression = 0.0  # learner pursuit/tradeoff reward shaping (0..1)
         self.combo_curriculum = 0.0  # share of fights that start mid-chain
         self.reset(np.ones(self.n, bool))
 
@@ -243,7 +259,15 @@ class ProArena:
         diff = self.difficulty[mask]
         w = self._pick_diff(n, len(MELEE_POOL), avoid_w[mask])
         a = self._pick_diff(n, len(ARMOR_TIERS), avoid_a[mask])
-        rr = self._pick_diff(n, len(RANGED_TYPES), avoid_r[mask])
+        ranged_avoid = avoid_r[mask]
+        rr = np.empty(n, np.int32)
+        for excluded in np.unique(ranged_avoid):
+            choose = ranged_avoid == excluded
+            weights = RANGED_LOADOUT_WEIGHTS.copy()
+            if 0 <= excluded < len(weights):
+                weights[excluded] = 0.0
+            weights /= weights.sum()
+            rr[choose] = r.choice(len(RANGED_TYPES), int(choose.sum()), p=weights)
         if pro:
             # Professionals favour the strong half of the arsenal & heavy armour.
             strong = np.array([6, 7, 8, 9, 10, 11], np.int32)
@@ -302,6 +326,9 @@ class ProArena:
         B.pearls[mask] = pearls
         B.buffs[mask] = buffs
         B.ranged[mask] = ranged
+        B.has_ranged_weapon[mask] = (
+            (ranged > 0.0) & np.isin(rr, [RANGED_BOW_INDEX, RANGED_CROSSBOW_INDEX])
+        )
         B.crystals[mask] = crystals
         B.obsidian[mask] = obsidian
         B.anchors[mask] = anchors
@@ -369,6 +396,10 @@ class ProArena:
         """0..1 — how relentlessly the scripted pro chases combo chains."""
         self.e_aggression = float(np.clip(value, 0.0, 1.0))
 
+    def set_player_aggression(self, value: float) -> None:
+        """0..1 — reward pressure for the learner to close distance and trade damage."""
+        self.player_aggression = float(np.clip(value, 0.0, 1.0))
+
     def set_ai_action(self, action) -> None:
         """Queue the action the AI opponent should execute on the next step."""
         self._ai_action = np.asarray(action, np.int32)
@@ -425,6 +456,87 @@ class ProArena:
         dealt = used_abs + np.where(pop, old_hp, np.maximum(0.0, old_hp - new_hp))
         B.hp = new_hp
         return dealt, pop
+
+    def _ranged_action(
+        self,
+        shooter: BotArrays,
+        target: BotArrays,
+        requested: np.ndarray,
+        dist: np.ndarray,
+        direction: np.ndarray,
+    ) -> dict[str, np.ndarray]:
+        """Run the generic projectile or bow/crossbow draw-and-release state machine."""
+        ranged_type = shooter.ranged_type
+        is_bow = ranged_type == RANGED_BOW_INDEX
+        is_crossbow = ranged_type == RANGED_CROSSBOW_INDEX
+        is_charged_weapon = is_bow | is_crossbow
+        cover = self._obstacle_between(shooter.pos, target.pos)
+        in_range = (dist >= 1.6) & (dist <= RANGED_MAX_RANGE[ranged_type])
+        valid_target = in_range & ~cover
+        unlocked = shooter.use_lock <= 0.0
+        idle = shooter.ranged_charge <= 0.0
+        available = (shooter.ranged > 0.0) | shooter.ranged_loaded
+        ready_action = requested & unlocked & idle
+        due = (shooter.ranged_charge > 0.0) & (shooter.ranged_charge <= DT + 1e-6)
+
+        # Bows release automatically after a full draw. Crossbows consume a bolt
+        # when loading completes, remain loaded, then fire on the next action 17.
+        start_charge = (ready_action & is_charged_weapon & ~shooter.ranged_loaded
+                        & (shooter.ranged > 0.0) & valid_target)
+        start_charge &= RANGED_CHARGE[ranged_type] > 0.0
+        bow_shot = due & is_bow & (shooter.ranged > 0.0)
+        crossbow_loaded = due & is_crossbow & (shooter.ranged > 0.0)
+        generic_shot = (ready_action & ~is_charged_weapon & (shooter.ranged > 0.0)
+                        & valid_target)
+        crossbow_shot = (ready_action & is_crossbow & shooter.ranged_loaded
+                         & valid_target & ~due)
+        shot = generic_shot | bow_shot | crossbow_shot
+
+        # A completed bow draw expends an arrow; a completed crossbow draw loads
+        # one into the weapon, so the loaded state remains usable with zero reserve.
+        consume_arrow = bow_shot | crossbow_loaded
+        shooter.ranged = np.where(consume_arrow, np.maximum(0.0, shooter.ranged - 1.0),
+                                  shooter.ranged)
+        shooter.ranged_loaded = np.where(crossbow_loaded, True, shooter.ranged_loaded)
+        shooter.ranged_loaded = np.where(crossbow_shot, False, shooter.ranged_loaded)
+        shooter.ranged_charge = np.where(start_charge | due, 0.0, shooter.ranged_charge)
+        shooter.ranged_charge = np.where(start_charge, RANGED_CHARGE[ranged_type],
+                                         shooter.ranged_charge)
+        shooter.use_lock = np.where(start_charge, RANGED_CHARGE[ranged_type], shooter.use_lock)
+        # The draw lock has elapsed by release/load completion. A fired crossbow
+        # receives the short action lock; a bow can begin its next draw immediately.
+        shooter.use_lock = np.where(crossbow_loaded, 0.0, shooter.use_lock)
+        shooter.use_lock = np.where(bow_shot, 0.0, shooter.use_lock)
+        shooter.use_lock = np.where(generic_shot | crossbow_shot,
+                                    RANGED_ACTION_LOCK[ranged_type], shooter.use_lock)
+
+        blocked = (target.has_shield & target.shield_up & (target.shield_disabled <= 0.0)
+                   & (RANGED_PIERCE[ranged_type] < 0.5))
+        landed = shot & valid_target & ~blocked
+        rdm, rkb, rsl, rpierce = shooter.ranged_spec()
+        raw = np.where(landed, rdm, 0.0)
+        dealt, popped = self._damage(target, raw, bypass=rpierce)
+        target.slow = np.where(dealt > 0.0, np.maximum(target.slow, rsl), target.slow)
+        target.vel += direction * np.where(dealt > 0.0, rkb, 0.0)[:, None]
+        missed = (shot & ~valid_target) | (ready_action & available & ~valid_target
+                                            & ~shooter.ranged_loaded)
+        invalid = ready_action & ~available
+        return {
+            "acted": start_charge | due | shot,
+            "charge_started": start_charge,
+            "shot": shot,
+            "bow_shot": bow_shot,
+            "crossbow_shot": crossbow_shot,
+            # Projectile contact is a useful hit even during the target's vanilla
+            # hurt cooldown; separate this from the numeric damage reward.
+            "bow_hit": bow_shot & landed,
+            "crossbow_hit": crossbow_shot & landed,
+            "damage": dealt,
+            "popped": popped,
+            "blocked": shot & valid_target & blocked,
+            "waste": missed | invalid,
+            "tech": shot,
+        }
 
     def _explode(self, target: BotArrays, caster: BotArrays, power: float, falloff: float,
                  self_power: float, self_falloff: float, armor_kind: str = "blast"):
@@ -502,6 +614,19 @@ class ProArena:
         L, E = self.L, self.E
         d = E.pos - L.pos
         dist = np.linalg.norm(d, axis=1)
+        # Feature 18 doubles as a compact ranged state code. Put bow/crossbow
+        # availability well above the generic inventory-count range so the policy
+        # can condition action 17 on the correct equipment rather than infer it from
+        # an ambiguous sum of buffs and projectiles.
+        ranged_feature = np.clip((L.buffs + L.ranged) / 12.0, 0.0, 0.60)
+        has_bow = (L.has_ranged_weapon & (L.ranged_type == RANGED_BOW_INDEX)
+                   & (L.ranged > 0.0))
+        has_crossbow = (L.has_ranged_weapon & (L.ranged_type == RANGED_CROSSBOW_INDEX)
+                        & ((L.ranged > 0.0) | L.ranged_loaded))
+        ranged_feature = np.where(has_bow, 0.75, ranged_feature)
+        ranged_feature = np.where(has_crossbow, 0.85, ranged_feature)
+        ranged_feature = np.where(L.ranged_loaded, 1.10, ranged_feature)
+        ranged_feature = np.where(L.ranged_charge > 0.0, 1.25, ranged_feature).astype(np.float32)
         obs = np.stack([
             np.clip((L.hp + L.abs) / 20.0, 0, 1.5),
             np.clip((E.hp + E.abs) / 20.0, 0, 1.5),
@@ -521,7 +646,7 @@ class ProArena:
             np.clip(L.gaps / 5.0, 0, 1),
             np.clip(L.splashes / 5.0, 0, 1),
             np.clip(L.pearls / 4.0, 0, 1),
-            np.clip((L.buffs + L.ranged) / 12.0, 0, 1),
+            ranged_feature,
             ((L.has_shield & L.shield_up & (L.shield_disabled <= 0)).astype(np.float32)),
             ((E.has_shield & E.shield_up & (E.shield_disabled <= 0)).astype(np.float32)),
             np.clip(L.blocks / 24.0, 0, 1),
@@ -557,7 +682,8 @@ class ProArena:
         dist = np.linalg.norm(vec, axis=1)
         fwd = vec / np.maximum(dist, 1e-6)[:, None]
         e_move = np.zeros((self.n, 2), np.float32)
-        acted = np.zeros(self.n, bool)
+        # A held bow/crossbow use occupies the opponent until release, as in Forge.
+        acted = E.ranged_charge > 0.0
         info = {}
         # pro action cooldown: explosives/utilities can't fire every single tick
         utility_ready = E.pearl_cd <= 0.0
@@ -623,20 +749,18 @@ class ProArena:
             acted |= m
             L.slow = np.where(m, np.maximum(L.slow, 1.2), L.slow)
             info["e_minecart"] = m
-        # 6. ranged poke
-        m = (~acted) & (E.ranged > 0) & (dist >= 4.5) & (dist <= 13.5) & (E.cd <= 0.0) & chance(0.16 + 0.25 * diff)
-        if m.any():
-            rdm, rkb, rsl, rpierce = E.ranged_spec()
-            blocked = L.has_shield & L.shield_up & (L.shield_disabled <= 0) & (~rpierce)
-            dtg, _ = self._damage(L, np.where(m, rdm, 0.0), bypass=rpierce)
-            dtg = np.where(m & ~blocked, dtg, 0.0)
-            dmg_taken += dtg
-            L.slow = np.where(m & ~blocked, np.maximum(L.slow, rsl), L.slow)
-            L.vel -= fwd * np.where(m & ~blocked, rkb, 0.0)[:, None]
-            E.ranged = np.where(m, E.ranged - 1, E.ranged)
-            E.cd = np.where(m, 0.9, E.cd)
-            acted |= m
-            info["e_ranged"] = m
+        # 6. ranged poke. Bow/crossbow charges advance even while their use is held.
+        ranged_max = RANGED_MAX_RANGE[E.ranged_type]
+        ranged_in_range = (dist >= 4.5) & (dist <= ranged_max)
+        ranged_ready = (~acted) & ((E.ranged > 0.0) | E.ranged_loaded)
+        ranged_ready &= ranged_in_range & (E.cd <= 0.0) & (E.use_lock <= 0.0)
+        ranged_request = ranged_ready & chance(0.16 + 0.25 * diff)
+        ranged = self._ranged_action(E, L, ranged_request, dist, fwd)
+        dmg_taken += ranged["damage"]
+        acted |= ranged["acted"]
+        E.cd = np.where(ranged["shot"], np.maximum(E.cd, 0.15), E.cd)
+        if ranged["shot"].any():
+            info["e_ranged"] = ranged["shot"]
         # 7. pearl gap-close
         m = ((~acted) & (E.pearls > 0) & (E.pearl_cd <= 0) & (dist > 7.0) & (E.hp > 12.0)
              & chance(0.35))
@@ -743,8 +867,8 @@ class ProArena:
         reach = REACH + 0.45 * self.e_aggression
         vertical_delta = self.terrain.height(L.pos) - self.terrain.height(E.pos) + L.y - E.y
         want_hit = ((~E.shield_up) & (re_dist <= reach) & (np.abs(vertical_delta) <= 2.2)
-                    & (E.cd <= 0.0) & (r.random(self.n) < np.minimum(hit_p, 1.0))
-                    & (E.stun <= 0.0))
+                    & (E.cd <= 0.0) & (E.use_lock <= 0.0) & (E.ranged_charge <= 0.0)
+                    & (r.random(self.n) < np.minimum(hit_p, 1.0)) & (E.stun <= 0.0))
         if want_hit.any():
             blocked = L.has_shield & L.shield_up & (L.shield_disabled <= 0)
             axe_break = blocked & E.is_axe()
@@ -759,7 +883,7 @@ class ProArena:
                            (E.dmg() + bonus) * np.where(crit, 1.5, 1.0) * combo_ramp * punish,
                            0.0)
             dtg, pop = self._damage(L, raw, blast=False)
-            dmg_taken += np.where(want_hit & ~blocked, dtg, 0.0)
+            dmg_taken += np.where(want_hit & (~blocked | axe_break), dtg, 0.0)
             L.fire = np.where((dtg > 0) & (E.fire_sec() > 0),
                               np.maximum(L.fire, E.fire_sec()), L.fire)
             kb = np.where(real_hit & (dtg > 0), 4.4 * E.kb_mult(), 0.0)
@@ -773,6 +897,11 @@ class ProArena:
             L.stun = np.where(e_hit, np.maximum(L.stun, COMBO_STUN), L.stun)
             if pop.any():
                 info["totem_popped_learner"] = (info.get("totem_popped_learner", False) | pop)
+            blocked_by_shield = want_hit & blocked & ~axe_break
+            if blocked_by_shield.any():
+                info["blocked_hit"] = info.get("blocked_hit", np.zeros(self.n, bool)) | blocked_by_shield
+            if axe_break.any():
+                info["shield_broken"] = info.get("shield_broken", np.zeros(self.n, bool)) | axe_break
 
         # NOTE: the pro does NOT escape learner chains while the combo curriculum is on
         # (e_aggression > 0.5) — otherwise the student never gets to practise a long chain.
@@ -799,6 +928,8 @@ class ProArena:
             "move": e_move, "dist": dist, "fwd": fwd, "acted": acted,
             "dmg_dealt": dmg_dealt, "dmg_taken": dmg_taken, "healed": healed,
             "got_comboed": info.get("got_comboed"),
+            "blocked_hit": info.get("blocked_hit", np.zeros(self.n, bool)),
+            "shield_broken": info.get("shield_broken", np.zeros(self.n, bool)),
             "terrain_blocked": terrain_blocked, "pit_blocked": pit_blocked,
         }
 
@@ -812,6 +943,7 @@ class ProArena:
         L, E = self.L, self.E
         r = self.rng
         n = self.n
+        ranged_busy_at_start = E.ranged_charge > 0.0
         act = np.asarray(self._human_action, np.int32).reshape(-1)
         if act.size != n:
             act = np.resize(act, n)
@@ -848,8 +980,10 @@ class ProArena:
         m = a(7); move = np.where(m[:, None], right, move); want_attack |= m
         want_jump |= a(8)
         m = a(9)
-        move = np.where(m[:, None], fwd, move); want_jump |= m; sprinting |= m
-        speed = np.where(m, SPRINT * speed_mult, speed); want_attack |= m
+        move = np.where(m[:, None], fwd, move)
+        want_jump |= m
+        E.crit_armed = np.where(m, True, E.crit_armed)
+        E.crit_window = np.where(m, 0.8, E.crit_window)
         m = a(10)
         move = np.where(m[:, None], fwd, move); sprinting |= m
         speed = np.where(m, SPRINT * speed_mult, speed)
@@ -857,7 +991,7 @@ class ProArena:
 
         # ---- shield
         m = a(12)
-        ok = m & E.has_shield & (E.shield_disabled <= 0.0)
+        ok = m & E.has_shield & (E.shield_disabled <= 0.0) & (E.ranged_charge <= 0.0)
         E.shield_up = np.where(ok, True, E.shield_up)
         move = np.where(ok[:, None], -fwd * 0.45, move)
         waste |= m & ~ok
@@ -886,7 +1020,7 @@ class ProArena:
         waste |= a(14) & ~m
 
         # ---- ender pearl
-        m = a(15) & (E.pearls > 0) & (E.pearl_cd <= 0.0)
+        m = a(15) & (E.pearls > 0) & (E.pearl_cd <= 0.0) & (E.ranged_charge <= 0.0)
         if m.any():
             E.pearls = np.where(m, E.pearls - 1, E.pearls)
             E.pearl_cd = np.where(m, 1.5, E.pearl_cd)
@@ -909,21 +1043,10 @@ class ProArena:
         waste |= a(16) & ~m
 
         # ---- ranged
-        m = a(17) & (E.ranged > 0) & (E.use_lock <= 0.0)
-        if m.any():
-            rdm, rkb, rsl, rpierce = E.ranged_spec()
-            in_range = (dist >= 1.6) & (dist <= 16.0)
-            cover = self._obstacle_between(E.pos, L.pos)
-            blocked = L.has_shield & L.shield_up & (L.shield_disabled <= 0) & (~rpierce)
-            hit = m & in_range & (~cover) & (~blocked)
-            dtg, pop = self._damage(L, np.where(hit, rdm, 0.0), bypass=rpierce)
-            dmg_dealt += dtg
-            L.slow = np.where(hit, np.maximum(L.slow, rsl), L.slow)
-            L.vel += fwd * np.where(hit, rkb, 0.0)[:, None]
-            E.ranged = np.where(m, E.ranged - 1, E.ranged)
-            E.use_lock = np.where(m, 0.15, E.use_lock)
-            tech = np.where(m, T_RANGED, tech)
-        waste |= a(17) & ~m
+        ranged = self._ranged_action(E, L, a(17), dist, fwd)
+        dmg_taken += ranged["damage"]
+        tech = np.where(ranged["tech"], T_RANGED, tech)
+        waste |= ranged["waste"]
 
         # ---- barricade
         m = (a(18) & (E.blocks >= 2) & (E.use_lock <= 0.0) & (dist >= 1.6) & (dist <= 7.5)
@@ -1093,9 +1216,17 @@ class ProArena:
         # ---- vertical physics for the human
         jump_ok = want_jump & (E.y <= 1e-4) & (E.web <= 0)
         E.vy = np.where(jump_ok, 8.4, E.vy)
+        prev_vy = E.vy.copy()
         E.y = E.y + E.vy * DT
         E.vy = np.where(E.y > 0, E.vy - 28.0 * DT, 0.0)
         E.y = np.maximum(E.y, 0.0)
+
+        # Action 9's queued attack lands on the descending part of the jump.
+        falling = (E.y > 0.05) & (prev_vy < 0.0) & (~sprinting)
+        crit_auto = (E.crit_armed & (E.crit_window > 0.0) & falling
+                     & (E.cd <= 0.05) & (np.linalg.norm(L.pos - E.pos, axis=1) <= REACH + 0.2))
+        want_attack |= crit_auto
+        E.crit_armed = np.where(crit_auto, False, E.crit_armed)
 
         # ---- melee (human -> AI)
         re_dist = np.linalg.norm(L.pos - E.pos, axis=1)
@@ -1110,7 +1241,7 @@ class ProArena:
         break_shield = swing & l_shield & self._axe_of(E)
         blocked = swing & l_shield & (~self._axe_of(E))
         real = swing & (~l_shield | break_shield)
-        crit = ((E.y > 0.05) & (E.vy < 0.0) & (~sprinting)) | ((E.pillar > 0) & (~sprinting))
+        crit = ((E.y > 0.05) & (prev_vy < 0.0) & (~sprinting)) | ((E.pillar > 0) & (~sprinting))
         wtap = a(26) & real
         mult = np.where(crit, 1.5, 1.0)
         mult = np.where(wtap, mult * 1.15, mult)
@@ -1139,6 +1270,7 @@ class ProArena:
         old_pos = E.pos.copy()
         E.pos, terrain_blocked, pit_blocked = self._move_with_terrain(old_pos, old_pos + E.vel * DT)
         E.vel = np.where(terrain_blocked[:, None], E.vel * 0.15, E.vel)
+        waste &= ~ranged_busy_at_start
 
         return {
             "move": move, "dist": np.linalg.norm(L.pos - E.pos, axis=1), "fwd": fwd,
@@ -1157,6 +1289,7 @@ class ProArena:
             self._prev_chain = np.zeros(self.n, np.int32)
         n = self.n
         L, E = self.L, self.E
+        ranged_busy_at_start = L.ranged_charge > 0.0
         self.step_count += 1
         self.t += DT
 
@@ -1175,7 +1308,14 @@ class ProArena:
             "minecart_hit": np.zeros(n, bool),
             "cage_blocked": np.zeros(n, bool),
             "wtap_combo": np.zeros(n, bool),
+            "bow_shot": np.zeros(n, bool),
+            "crossbow_shot": np.zeros(n, bool),
+            "bow_hit": np.zeros(n, bool),
+            "crossbow_hit": np.zeros(n, bool),
+            "ranged_charge_started": np.zeros(n, bool),
+            "critical_hit": np.zeros(n, bool),
             "combo_hit": np.zeros(n, bool),
+            "combo_followup": np.zeros(n, bool),
             "combo_broken": np.zeros(n, bool),
             "combo_countered": np.zeros(n, bool),
             "enemy_combo_broken": np.zeros(n, bool),
@@ -1191,6 +1331,9 @@ class ProArena:
 
         vec = E.pos - L.pos
         dist = np.linalg.norm(vec, axis=1)
+        initial_dist = dist.copy()
+        initial_learner_pos = L.pos.copy()
+        initial_enemy_pos = E.pos.copy()
         fwd = vec / np.maximum(dist, 1e-6)[:, None]
         right = np.stack([-fwd[:, 1], fwd[:, 0]], 1)
 
@@ -1228,9 +1371,9 @@ class ProArena:
         m = a(9)
         move = np.where(m[:, None], fwd, move)
         want_jump |= m
-        sprinting |= m
-        want_attack |= m
-        speed = np.where(m, SPRINT * speed_mult, speed)
+        # Action 9 queues a deliberate jump-crit; it must not sprint or swing on takeoff.
+        L.crit_armed = np.where(m, True, L.crit_armed)
+        L.crit_window = np.where(m, 0.8, L.crit_window)
         m = a(10)
         move = np.where(m[:, None], fwd, move)
         sprinting |= m
@@ -1241,10 +1384,11 @@ class ProArena:
 
         # --- 12 shield
         m = a(12)
-        ok = m & L.has_shield & (L.shield_disabled <= 0.0)
+        ok = m & L.has_shield & (L.shield_disabled <= 0.0) & (L.ranged_charge <= 0.0)
         L.shield_up = np.where(ok, True, L.shield_up)
         L.shield_held = np.where(ok, True, L.shield_held)
         move = np.where(ok[:, None], -fwd * 0.45, move)
+        tech = np.where(ok, T_SHIELD, tech)
         waste |= m & ~ok
 
         # --- 13 golden apple
@@ -1274,7 +1418,7 @@ class ProArena:
         waste |= a(14) & ((L.splashes <= 0) | (L.use_lock > 0.0))
 
         # --- 15 ender pearl
-        m = a(15) & (L.pearls > 0) & (L.pearl_cd <= 0.0)
+        m = a(15) & (L.pearls > 0) & (L.pearl_cd <= 0.0) & (L.ranged_charge <= 0.0)
         if m.any():
             L.pearls = np.where(m, L.pearls - 1, L.pearls)
             L.pearl_cd = np.where(m, 1.5, L.pearl_cd)
@@ -1302,26 +1446,24 @@ class ProArena:
             tech = np.where(m, T_BUFF, tech)
         waste |= a(16) & ~(m)
 
+        # Match the Forge navigation assist: action 17 may draw/load while still
+        # advancing toward a target outside melee reach, instead of wasting a tick
+        # standing still. The following draw ticks remain fully policy-controlled.
+        ranged_pursuit = a(17) & (dist > 3.0)
+        move = np.where(ranged_pursuit[:, None], fwd, move)
+
         # --- 17 ranged
-        m = a(17) & (L.ranged > 0) & (L.use_lock <= 0.0)
-        if m.any():
-            rdm, rkb, rsl, rpierce = L.ranged_spec()
-            in_range = (dist >= 1.6) & (dist <= 16.0)
-            cover = self._obstacle_between(L.pos, E.pos)
-            blocked = E.has_shield & E.shield_up & (E.shield_disabled <= 0) & (~rpierce)
-            hit = m & in_range & (~cover) & (~blocked)
-            raw = np.where(hit, rdm, 0.0)
-            dtg, pop = self._damage(E, raw, bypass=rpierce)
-            dmg_dealt += dtg
-            flags["totem_popped_enemy"] |= pop
-            E.slow = np.where(hit, np.maximum(E.slow, rsl), E.slow)
-            E.vel += fwd * np.where(hit, rkb, 0.0)[:, None]
-            flags["blocked_hit"] |= (m & blocked).astype(bool)
-            L.ranged = np.where(m, L.ranged - 1, L.ranged)
-            L.use_lock = np.where(m, 0.15, L.use_lock)
-            tech = np.where(m, T_RANGED, tech)
-            waste |= m & ~in_range
-        waste |= a(17) & (L.ranged <= 0)
+        ranged = self._ranged_action(L, E, a(17), dist, fwd)
+        dmg_dealt += ranged["damage"]
+        flags["totem_popped_enemy"] |= ranged["popped"]
+        flags["blocked_hit"] |= ranged["blocked"]
+        flags["bow_shot"] |= ranged["bow_shot"]
+        flags["crossbow_shot"] |= ranged["crossbow_shot"]
+        flags["bow_hit"] |= ranged["bow_hit"]
+        flags["crossbow_hit"] |= ranged["crossbow_hit"]
+        flags["ranged_charge_started"] |= ranged["charge_started"]
+        tech = np.where(ranged["tech"], T_RANGED, tech)
+        waste |= ranged["waste"]
 
         # --- 18 barricade
         m = (a(18) & (L.blocks >= 2) & (L.use_lock <= 0.0) & (dist >= 1.6) & (dist <= 7.5)
@@ -1545,6 +1687,12 @@ class ProArena:
         L.vel = np.where(terrain_blocked[:, None], L.vel * 0.15, L.vel)
         flags["terrain_blocked"] |= terrain_blocked
         flags["pit_blocked"] |= pit_blocked
+        target_dir_start = (initial_enemy_pos - initial_learner_pos) / np.maximum(
+            initial_dist[:, None], 1e-6
+        )
+        aggressive_approach = np.sum(
+            (L.pos - initial_learner_pos) * target_dir_start, axis=1
+        )
 
         # ---- enemy decides & moves
         if self.pve and self._human_action is not None:
@@ -1553,6 +1701,8 @@ class ProArena:
         else:
             brain = self._enemy_brain(act, dmg_dealt, dmg_taken, healed, None)
         dmg_dealt, dmg_taken, healed = brain["dmg_dealt"], brain["dmg_taken"], brain["healed"]
+        flags["blocked_hit"] |= brain.get("blocked_hit", np.zeros(n, bool))
+        flags["shield_broken"] |= brain.get("shield_broken", np.zeros(n, bool))
         flags["enemy_terrain_blocked"] |= brain.get("terrain_blocked", np.zeros(n, bool))
 
         # ---- obstacles & timers
@@ -1572,6 +1722,7 @@ class ProArena:
             B.pillar = np.maximum(0.0, B.pillar - DT)
             B.pearl_cd = np.maximum(0.0, B.pearl_cd - DT)
             B.use_lock = np.maximum(0.0, B.use_lock - DT)
+            B.ranged_charge = np.maximum(0.0, B.ranged_charge - DT)
             B.regen = np.maximum(0.0, B.regen - DT)
             B.cage_until = np.maximum(0.0, B.cage_until - DT)
             B.stun = np.maximum(0.0, B.stun - DT)
@@ -1579,6 +1730,8 @@ class ProArena:
             B.escape_cd = np.maximum(0.0, B.escape_cd - DT)
             B.counter_until = np.maximum(0.0, B.counter_until - DT)
             B.counter_armed = np.maximum(0.0, B.counter_armed - DT)
+            B.crit_window = np.maximum(0.0, B.crit_window - DT)
+            B.crit_armed &= B.crit_window > 0.0
             # a chain that is not continued (or escaped) expires
             B.combo_taken = np.where(B.combo_window <= 0.0, 0, B.combo_taken)
 
@@ -1608,6 +1761,11 @@ class ProArena:
         cover = self._obstacle_between(L.pos, E.pos)
         eff_reach = REACH + np.where(L.pillar > 0, 0.30, 0.0)
         vertical_delta = self.terrain.height(E.pos) - self.terrain.height(L.pos) + E.y - L.y
+        falling = (L.y > 0.05) & (prev_vy < 0.0) & (~sprinting)
+        crit_auto = (L.crit_armed & (L.crit_window > 0.0) & falling
+                     & (L.cd <= 0.05) & (re_dist <= REACH + 0.2))
+        want_attack |= crit_auto
+        L.crit_armed = np.where(crit_auto, False, L.crit_armed)
         swing = (want_attack & (L.use_lock <= 0.0) & (L.cd <= 0.04) & (re_dist <= eff_reach)
                  & (np.abs(vertical_delta) <= 2.2)
                  & ((~cover) | (L.pillar > 0)) & (L.stun <= 0.0))
@@ -1631,10 +1789,12 @@ class ProArena:
         kb = np.where(wtap_attack, 0.0, kb)  # W-tap cancels knockback
         E.vel += hit_dir * kb[:, None]
         hit_landed = real & (dealt > 0.0)
+        flags["combo_followup"] |= hit_landed & (E.combo_taken > 0)
         E.combo_taken = np.where(hit_landed, E.combo_taken + 1, E.combo_taken)
         E.combo_window = np.where(hit_landed, COMBO_WINDOW, E.combo_window)
         E.stun = np.where(hit_landed, np.maximum(E.stun, COMBO_STUN), E.stun)
         flags["combo_hit"] |= hit_landed
+        flags["critical_hit"] |= hit_landed & crit
         flags["wtap_combo"] |= wtap_attack & real
         flags["shield_broken"] |= break_shield
         flags["blocked_hit"] |= blocked
@@ -1658,7 +1818,8 @@ class ProArena:
 
         # ---- rewards
         reward = np.full(n, -0.01, np.float32)
-        reward += dmg_dealt * 2.5 - dmg_taken * 1.4 + healed * 0.4
+        damage_penalty = 1.4 - 0.25 * self.player_aggression
+        reward += dmg_dealt * 2.5 - dmg_taken * damage_penalty + healed * 0.4
         reward += np.where(flags["shield_broken"], 4.0, 0.0)
         reward += np.where(flags["blocked_hit"], 2.5, 0.0)
         reward += np.where(flags["trapped_enemy"], 3.0, 0.0)
@@ -1667,7 +1828,12 @@ class ProArena:
         reward += np.where(flags["anchor_hit"], 4.0, 0.0)
         reward += np.where(flags["minecart_hit"], 4.0, 0.0)
         reward += np.where(flags["cage_blocked"], 4.0, 0.0)
-        reward += np.where(flags["wtap_combo"], 2.0, 0.0)
+        reward += np.where(flags["wtap_combo"], 3.0, 0.0)
+        reward += np.where(flags["critical_hit"], 2.0, 0.0)
+        reward += np.where(flags["ranged_charge_started"], 4.0, 0.0)
+        reward += np.where(flags["bow_shot"] | flags["crossbow_shot"], 4.0, 0.0)
+        reward += np.where(flags["bow_hit"] | flags["crossbow_hit"], 8.0, 0.0)
+        reward += np.where(flags["combo_followup"], 1.5, 0.0)
         reward += np.where(flags["totem_popped_enemy"], 8.0, 0.0)
         reward -= np.where(flags["self_blast"], 3.0, 0.0)
         reward -= np.where(flags["terrain_blocked"], 0.35, 0.0)
@@ -1678,10 +1844,16 @@ class ProArena:
         reward += np.where(flags["combo_broken"], 7.0, 0.0)
         reward += np.where(flags["combo_countered"], 8.0, 0.0)
         reward -= np.where(flags["enemy_combo_broken"], 4.0, 0.0)
+        # While an arrow is being drawn/loaded the runtime suppresses fresh actions;
+        # do not train the actor to regard those ignored policy outputs as mistakes.
+        waste &= ~ranged_busy_at_start
 
         prev_dist = brain["dist"]
         new_dist = re_dist
         reward += np.where(new_dist > 3.0, np.clip((prev_dist - new_dist) * 0.05, -0.05, 0.05), 0.0)
+        if self.player_aggression > 0.0:
+            approach_bonus = np.clip(aggressive_approach, -0.75, 0.75) * 0.60
+            reward += self.player_aggression * np.where(initial_dist > REACH, approach_bonus, 0.0)
         reward += np.where(enemy_dead, 100.0, 0.0)
         reward -= np.where(learner_dead, 100.0, 0.0)
         reward = reward.astype(np.float32)
@@ -1789,6 +1961,10 @@ class ProPvPEnv(gym.Env):
             "minecart_hit": bool(info["minecart_hit"][0]),
             "cage_blocked": bool(info["cage_blocked"][0]),
             "wtap_combo": bool(info["wtap_combo"][0]),
+            "bow_shot": bool(info["bow_shot"][0]),
+            "crossbow_shot": bool(info["crossbow_shot"][0]),
+            "bow_hit": bool(info["bow_hit"][0]),
+            "crossbow_hit": bool(info["crossbow_hit"][0]),
             "self_blast": bool(info["self_blast"][0]),
             "totem_popped_learner": bool(info["totem_popped_learner"][0]),
             "totem_popped_enemy": bool(info["totem_popped_enemy"][0]),
@@ -1872,6 +2048,9 @@ class ProPvPVecEnv(VecEnv):
 
     def set_aggression(self, value: float) -> None:
         self.core.set_aggression(value)
+
+    def set_player_aggression(self, value: float) -> None:
+        self.core.set_player_aggression(value)
 
     def set_combo_curriculum(self, share: float) -> None:
         self.core.set_combo_curriculum(share)
