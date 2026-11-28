@@ -162,7 +162,11 @@ def main() -> None:
                 f"foe-counts[{active_counts}] | "
                 f"W-tap={env.tech_counts.get('wtap_combo', 0):,} "
                 f"AoE-hits={env.aoe_hits:,} AoE-kills={env.aoe_kills:,} "
-                f"combo-breaks={env.combo_breaks:,} counters={env.combo_counters:,}",
+                f"combo-breaks={env.combo_breaks:,} counters={env.combo_counters:,} "
+                f"hits={env.combo_hits:,} followups={env.combo_followups:,} "
+                f"crits={env.crit_hits:,} "
+                f"bow={env.bow_hits:,}/{env.bow_shots:,} "
+                f"crossbow={env.crossbow_hits:,}/{env.crossbow_shots:,}",
                 flush=True,
             )
             status = {
@@ -183,6 +187,11 @@ def main() -> None:
                 "opponents_average": round(avg_opponents, 3),
                 "opponents_histogram": env.opponents_histogram.tolist(),
                 "enemy_kills": env.enemy_kills,
+                "critical_hits": env.crit_hits,
+                "bow_shots": env.bow_shots,
+                "crossbow_shots": env.crossbow_shots,
+                "bow_hits": env.bow_hits,
+                "crossbow_hits": env.crossbow_hits,
                 "aoe_enemy_hits": env.aoe_hits,
                 "aoe_enemy_kills": env.aoe_kills,
                 "aoe_enemy_damage": round(env.aoe_damage, 2),
@@ -198,6 +207,7 @@ def main() -> None:
                     "breaks": env.combo_breaks,
                     "counters": env.combo_counters,
                     "hits": env.combo_hits,
+                    "followups": env.combo_followups,
                 },
                 "terrain_blocked_steps": env.terrain_blocked,
                 "pit_blocked_steps": env.pit_blocked,
@@ -240,6 +250,11 @@ def main() -> None:
         "opponents_average": round(env.opponents_total / max(1, env.episodes), 3),
         "opponents_histogram": env.opponents_histogram.tolist(),
         "enemy_kills": env.enemy_kills,
+        "critical_hits": env.crit_hits,
+        "bow_shots": env.bow_shots,
+        "crossbow_shots": env.crossbow_shots,
+        "bow_hits": env.bow_hits,
+        "crossbow_hits": env.crossbow_hits,
         "aoe_enemy_hits": env.aoe_hits,
         "aoe_enemy_kills": env.aoe_kills,
         "aoe_enemy_damage": round(env.aoe_damage, 2),
@@ -251,6 +266,7 @@ def main() -> None:
             "breaks": env.combo_breaks,
             "counters": env.combo_counters,
             "hits": env.combo_hits,
+            "followups": env.combo_followups,
         },
         "techniques": dict(sorted(env.tech_counts.items())),
         "terrain_blocked_steps": env.terrain_blocked,

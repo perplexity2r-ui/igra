@@ -17,11 +17,77 @@ def test_multi_arena_has_three_to_eight_live_opponents_and_crowd_features():
 
     assert obs.shape == (48, MULTI_OBS_DIM)
     assert MULTI_OBS_DIM == 52
+    shield_up = (arena.core.L.has_shield & arena.core.L.shield_up
+                 & (arena.core.L.shield_disabled <= 0.0))
+    np.testing.assert_array_equal(obs[:, 19], shield_up.astype(np.float32))
     assert np.all(counts >= MIN_OPPONENTS)
     assert np.all(counts <= MAX_OPPONENTS)
     np.testing.assert_allclose(obs[:, 44], counts / MAX_OPPONENTS)
     assert np.any(counts == MAX_OPPONENTS)
     assert np.count_nonzero(counts == MAX_OPPONENTS) > np.count_nonzero(counts == MIN_OPPONENTS)
+
+
+def test_shield_blocking_state_is_observed_and_real_melee_blocks_are_counted():
+    arena = MultiOpponentArena(1, seed=207, terrain_mix=0.0, max_opponents=3)
+    arena.set_enemy_skill(1.0)
+    arena.set_aggression(1.0)
+    arena.core.L.pos[0] = np.array([0.0, 0.0], dtype=np.float32)
+    arena.core.L.has_shield[0] = True
+    arena.core.L.crystals[0] = arena.core.L.anchors[0] = arena.core.L.minecarts[0] = 0.0
+    arena.enemies.pos[0, :3] = np.array([[2.5, 0.0], [7.5, 0.0], [0.0, 7.5]])
+    arena.enemies.weapon[0, :3] = 3  # non-axe, so a raised shield must block the swing
+    arena.enemies.cd[0, :3] = 0.0
+    arena.enemies.has_shield[0, :3] = False
+    arena.enemies.gaps[0, :3] = arena.enemies.splashes[0, :3] = 0.0
+    arena.enemies.pearls[0, :3] = arena.enemies.buffs[0, :3] = 0.0
+    arena.enemies.crystals[0, :3] = arena.enemies.obsidian[0, :3] = 0.0
+    arena.enemies.anchors[0, :3] = arena.enemies.minecarts[0, :3] = 0.0
+    arena.enemies.ranged[0, :3] = arena.enemies.cobwebs[0, :3] = 0.0
+    arena.enemies.lava_bk[0, :3] = 0.0
+    arena.active_slot[0] = 0
+    arena._copy_slot_to_core(np.array([0], dtype=np.int64))
+    assert arena._obs()[0, 19] == 0.0
+
+    _, _, _, _, _, info = arena.step(np.array([12], dtype=np.int32))
+
+    assert arena._obs()[0, 19] == 1.0
+    assert info["tech"][0] == 17
+    assert info["blocked_hit"][0]
+    assert info["damage_taken"][0] == 0.0
+
+
+def test_action_nine_queues_and_lands_a_jump_critical_hit():
+    arena = MultiOpponentArena(1, seed=208, terrain_mix=0.0, max_opponents=3)
+    arena.set_enemy_skill(0.0)
+    arena.set_aggression(0.0)
+    arena.core.L.pos[0] = np.array([0.0, 0.0], dtype=np.float32)
+    arena.core.L.vel[0] = 0.0
+    arena.core.L.y[0] = arena.core.L.vy[0] = arena.core.L.cd[0] = 0.0
+    arena.core.L.has_shield[0] = False
+    arena.core.L.stun[0] = 0.0
+    arena.enemies.pos[0, :3] = np.array([[2.8, 0.0], [7.5, 0.0], [0.0, 7.5]])
+    arena.enemies.hp[0, :3] = 20.0
+    arena.enemies.weapon[0, :3] = 0
+    arena.enemies.stun[0, 0] = 5.0
+    arena.enemies.has_shield[0, :3] = False
+    arena.enemies.gaps[0, :3] = arena.enemies.splashes[0, :3] = 0.0
+    arena.enemies.pearls[0, :3] = arena.enemies.buffs[0, :3] = 0.0
+    arena.enemies.crystals[0, :3] = arena.enemies.obsidian[0, :3] = 0.0
+    arena.enemies.anchors[0, :3] = arena.enemies.minecarts[0, :3] = 0.0
+    arena.enemies.ranged[0, :3] = arena.enemies.cobwebs[0, :3] = 0.0
+    arena.enemies.lava_bk[0, :3] = 0.0
+    arena.active_slot[0] = 0
+    arena._copy_slot_to_core(np.array([0], dtype=np.int64))
+
+    landed_crit = False
+    for step in range(8):
+        action = 9 if step == 0 else 0
+        _, _, _, _, _, info = arena.step(np.array([action], dtype=np.int32))
+        landed_crit |= bool(info["critical_hit"][0])
+        if landed_crit:
+            break
+
+    assert landed_crit
 
 
 def test_observation_includes_nearest_non_target_opponent_offset():

@@ -96,7 +96,7 @@ def test_learner_can_build_a_chain_on_the_enemy():
     max_chain = 0
     for _ in range(120):
         dist = np.linalg.norm(a.E.pos - a.L.pos, axis=1)
-        act = np.where(dist < 3.0, 9, 10)
+        act = np.where(dist < 3.0, 5, 1)
         _, _, _, _, done, _ = a.step(act.astype(np.int32))
         max_chain = max(max_chain, int(a.E.combo_taken.max()))
         if bool(done.all()):
@@ -106,6 +106,7 @@ def test_learner_can_build_a_chain_on_the_enemy():
 
 def test_combo_window_expires():
     a = make(n=8)
+    a.E.stun[:] = 5.0  # isolate timer expiry from a random opponent melee follow-up
     a.L.combo_taken[:] = 3
     a.L.combo_window[:] = 0.05
     a.step(np.zeros(8, np.int32))
@@ -154,7 +155,7 @@ def test_human_chain_reels_the_ai_in_pve():
     a.L.hurt_cd[0] = 0.0
     a.E.pos[0] = a.L.pos[0] + np.array([1.2, 0.0], np.float32)
     a.E.cd[0] = 0.0
-    a.set_human_action(np.array([9]))          # sprint-hit
+    a.set_human_action(np.array([5]))          # forward + immediate charged hit
     _, _, _, _, _, info = a.step(np.array([0]))
     assert int(a.L.combo_taken[0]) >= 1 or bool(info["combo_hit"][0]), \
         "удар игрока должен вести цепочку на ИИ"

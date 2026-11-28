@@ -480,6 +480,11 @@ class MultiOpponentArena:
             self._retarget(~active_alive & self.alive.any(axis=1))
 
         old_enemy_count = self.alive.sum(axis=1).astype(np.int32)
+        distances_before = np.linalg.norm(
+            self.enemies.pos - self.core.L.pos[:, None, :], axis=2
+        )
+        close_crowd_before = (self.alive & (distances_before <= 4.2)).sum(axis=1)
+        target_distance_before = np.linalg.norm(self.core.E.pos - self.core.L.pos, axis=1)
         other_blocked, other_pits = self._move_other_opponents()
         self._copy_slot_to_core(np.flatnonzero(self.alive.any(axis=1)))
         learner_alive_before = self.core.L.hp > DEATH
@@ -500,6 +505,16 @@ class MultiOpponentArena:
         final_crowd_kill = enemy_dead & (old_enemy_count > 0)
         reward = reward.copy()
         damage_penalty = 1.4 - 0.25 * self.player_aggression
+        # Aggression should not mean blindly sprinting into the center of a crowd.
+        # Price a forward entry when several opponents are already close, and give a
+        # small alternative reward for a deliberate retreat/reposition.
+        crowded_entry = ((close_crowd_before >= 2)
+                         & (target_distance_before > REACH + 0.4)
+                         & np.isin(actions, [1, 5, 9, 10]))
+        deliberate_reposition = ((close_crowd_before >= 2)
+                                 & np.isin(actions, [2, 3, 4, 11, 15, 18, 20, 25, 28]))
+        reward -= crowded_entry.astype(np.float32) * 0.65
+        reward += deliberate_reposition.astype(np.float32) * 0.15
         reward += aoe_damage * 2.5 + aoe_totem_pops * 8.0 + aoe_kills * 100.0
         reward += final_crowd_kill.astype(np.float32) * FULL_CROWD_WIN_BONUS
         reward -= extra_damage * damage_penalty
@@ -623,6 +638,12 @@ class MultiOpponentVecEnv(VecEnv):
         self.combo_breaks = 0
         self.combo_counters = 0
         self.combo_hits = 0
+        self.combo_followups = 0
+        self.crit_hits = 0
+        self.bow_shots = 0
+        self.crossbow_shots = 0
+        self.bow_hits = 0
+        self.crossbow_hits = 0
         self.enemy_kills = 0
         self.aoe_hits = 0
         self.aoe_kills = 0
@@ -696,6 +717,12 @@ class MultiOpponentVecEnv(VecEnv):
         self.combo_breaks += int(np.count_nonzero(info["combo_broken"] & active))
         self.combo_counters += int(np.count_nonzero(info["combo_countered"] & active))
         self.combo_hits += int(np.count_nonzero(info["combo_hit"] & active))
+        self.combo_followups += int(np.count_nonzero(info["combo_followup"] & active))
+        self.crit_hits += int(np.count_nonzero(info["critical_hit"] & active))
+        self.bow_shots += int(np.count_nonzero(info["bow_shot"] & active))
+        self.crossbow_shots += int(np.count_nonzero(info["crossbow_shot"] & active))
+        self.bow_hits += int(np.count_nonzero(info["bow_hit"] & active))
+        self.crossbow_hits += int(np.count_nonzero(info["crossbow_hit"] & active))
         self.terrain_blocked += int(np.count_nonzero(info["terrain_blocked"] & active))
         self.pit_blocked += int(np.count_nonzero(info["pit_blocked"] & active))
         self.extra_terrain_blocked += int(np.count_nonzero(info["enemy_terrain_blocked"] & active))
