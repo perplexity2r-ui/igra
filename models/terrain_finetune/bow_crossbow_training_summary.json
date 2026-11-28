@@ -81,8 +81,7 @@
     "action_mismatches": 0
   },
   "unverified": [
-    "Forge Java source has not been compiled in this sandbox.",
-    "The installed mods/pvp JAR has not been rebuilt and still contains its previous policy.",
+    "Forge Java source was built by GitHub Actions, but not compiled in this local sandbox.",
     "No live Minecraft server test was run."
   ]
 }

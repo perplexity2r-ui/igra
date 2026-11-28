@@ -69,9 +69,10 @@ seed 6069), it fired 531 bow shots (323 unblocked contacts) and 358 crossbow sho
 contacts); the old actor fired neither. The candidate won 69 fights versus 62 for the old
 actor in this single seed, which is not enough evidence to claim a win-rate improvement.
 The actor was exported to `ppo_policy.bin`; the exporter matched SB3 on 8,192 observations
-(max logit delta `5.72e-06`, zero action mismatches). This verifies the binary export, not
-a live Forge match. The installed JAR has not been rebuilt, and the Forge runtime has not
-yet been tested in-game.
+(max logit delta `5.72e-06`, zero action mismatches). GitHub Actions built and published
+the JAR with this actor; the Forge mod now reports `AI Pilot 7` (version `1.0.7`). This
+verifies the build and binary export, not a live Forge match; the runtime has not yet
+been tested in-game.
 
 ## Observation compatibility
 
